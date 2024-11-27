@@ -1,5 +1,5 @@
-import { FusesPlugin } from '@electron-forge/plugin-fuses';
-import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { FusesPlugin } from '@electron-forge/plugin-fuses'
+import { FuseV1Options, FuseVersion } from '@electron/fuses'
 
 const exports = {
   packagerConfig: {
@@ -41,6 +41,6 @@ const exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
-};
+}
 
-export default exports;
+export default exports

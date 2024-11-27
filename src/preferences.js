@@ -1,4 +1,4 @@
-import Store from 'electron-store';
+import Store from 'electron-store'
 
 class Preferences {
   constructor(fileName = 'preferences.json') {
@@ -7,20 +7,20 @@ class Preferences {
       defaults: {
         theme: 'light',
       },
-    });
+    })
   }
 
   get(key, defaultValue = null) {
-    return this.store.get(key, defaultValue);
+    return this.store.get(key, defaultValue)
   }
 
   set(key, value) {
-    this.store.set(key, value);
+    this.store.set(key, value)
   }
 
   delete(key) {
-    this.store.delete(key);
+    this.store.delete(key)
   }
 }
 
-export default new Preferences();
+export default new Preferences()
