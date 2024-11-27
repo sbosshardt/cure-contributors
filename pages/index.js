@@ -1,7 +1,10 @@
-import { React } from 'react'
+import { Button } from 'react-bootstrap'
 
-const Home = () => {
-  return <h1>Welcome to Cure Contributors</h1>
+export default function Home() {
+  return (
+    <div>
+      <h1>Welcome to Cure Contributors</h1>
+      <Button variant="primary">Click Me</Button>
+    </div>
+  )
 }
-
-export default Home

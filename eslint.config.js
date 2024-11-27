@@ -6,7 +6,7 @@ import pluginReact from 'eslint-plugin-react'
 export default [
   {
     // Note: there should be no other properties in this object
-    ignores: ['.next/*/*']
+    ignores: ['.next/*/*'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx}'],
@@ -19,7 +19,9 @@ export default [
       quotes: ['error', 'single'], // Enforce single quotes (optional)
       'no-console': 'off', // Allow console statements
     },
+
   },
   pluginJs.configs.recommended,
   pluginReact.configs.flat.recommended,
+  pluginReact.configs.flat['jsx-runtime'],
 ]
