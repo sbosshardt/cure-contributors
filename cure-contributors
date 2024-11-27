@@ -5,7 +5,14 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import { Command } from 'commander'
-import { purgeCureList } from './src/tasks.js'
+import {
+  createDb,
+  resetDb,
+  importContributions,
+  importCureList,
+  generateReport,
+  purgeContributions,
+} from './src/tasks.js'
 
 // Recreate __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -16,30 +23,83 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
 
 // Create CLI parser
 const program = new Command()
+let commandPromise
 
 program
   .version(packageJson.version, '-v, --version', 'Output the current version')
   .description(packageJson.description)
-  .option('--purge-cure-list', 'Purge the cure list')
   .helpCommand(true)
 
-program.parse(process.argv)
-const options = program.opts()
-
-// Handle CLI commands
-if (options.purgeCureList) {
-  purgeCureList().then(() => process.exit(0))
-} else {
-  // Launch the Electron GUI if no CLI command is provided
-  const electronPath = path.join(
-    __dirname,
-    'node_modules/electron/dist/electron',
-  ) // Direct path to Electron executable
-  const electronAppPath = path.resolve(__dirname, '.')
-
-  const child = spawn(electronPath, [electronAppPath])
-
-  child.on('close', (code) => {
-    process.exit(code)
+// Create DB command
+program
+  .command('create-db <dbFile>')
+  .description('Create a new database file (if needed)')
+  .action((dbFile) => {
+    commandPromise = createDb(dbFile)
   })
+
+// Reset DB command
+program
+  .command('reset-db <dbFile>')
+  .description('Delete all existing tables and recreate them')
+  .action((dbFile) => {
+    commandPromise = resetDb(dbFile)
+  })
+
+// Import contributions command
+program
+  .command('import-contributions <dbFile> <csvFiles...>')
+  .description('Import contributions CSV files into the database')
+  .action((dbFile, csvFiles) => {
+    commandPromise = importContributions(dbFile, csvFiles)
+  })
+
+// Import cure list command
+program
+  .command('import-cure-list <dbFile> <excelFile>')
+  .description('Import a cure list Excel file into the database')
+  .action((dbFile, excelFile) => {
+    commandPromise = importCureList(dbFile, excelFile)
+  })
+
+// Generate report command
+program
+  .command('generate-report <dbFile>')
+  .description('Generate a report based on the database')
+  .option(
+    '-o, --output-file <outputFile>',
+    'Write output to a file instead of stdout',
+  )
+  .action((dbFile, options) => {
+    commandPromise = generateReport(dbFile, options.outputFile || null)
+  })
+
+// Purge contributions command
+program
+  .command('purge-contributions <dbFile>')
+  .description('Purge contributions data from db')
+  .action((dbFile) => {
+    commandPromise = purgeContributions(dbFile)
+  })
+
+// Parse the command line arguments
+program.parse(process.argv)
+
+//console.log('Program args:', JSON.stringify(program.args))
+
+// Determine if program is intended to be run as GUI or CLI.
+if (commandPromise && program.args.length > 0) {
+  // CLI intended. At this point in execution, processing is complete?
+  //process.exit(0)
+  await commandPromise.then((result) => process.exit(result))
 }
+
+// Launch the Electron GUI if no CLI command is provided
+const electronPath = path.join(__dirname, 'node_modules/electron/dist/electron') // Direct path to Electron executable
+const electronAppPath = path.resolve(__dirname, '.')
+
+const child = spawn(electronPath, [electronAppPath])
+
+child.on('close', (code) => {
+  process.exit(code)
+})
