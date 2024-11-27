@@ -23,8 +23,8 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
 
 // Create CLI parser
 const program = new Command()
-let commandPromise
 
+// Configuration used by help command
 program
   .version(packageJson.version, '-v, --version', 'Output the current version')
   .description(packageJson.description)
@@ -34,32 +34,36 @@ program
 program
   .command('create-db <dbFile>')
   .description('Create a new database file (if needed)')
-  .action((dbFile) => {
-    commandPromise = createDb(dbFile)
+  .action(async (dbFile) => {
+    const code = await createDb(dbFile)
+    process.exit(code)
   })
 
 // Reset DB command
 program
   .command('reset-db <dbFile>')
   .description('Delete all existing tables and recreate them')
-  .action((dbFile) => {
-    commandPromise = resetDb(dbFile)
+  .action(async (dbFile) => {
+    const code = await resetDb(dbFile)
+    process.exit(code)
   })
 
 // Import contributions command
 program
   .command('import-contributions <dbFile> <csvFiles...>')
   .description('Import contributions CSV files into the database')
-  .action((dbFile, csvFiles) => {
-    commandPromise = importContributions(dbFile, csvFiles)
+  .action(async (dbFile, csvFiles) => {
+    const code = await importContributions(dbFile, csvFiles)
+    process.exit(code)
   })
 
 // Import cure list command
 program
   .command('import-cure-list <dbFile> <excelFile>')
   .description('Import a cure list Excel file into the database')
-  .action((dbFile, excelFile) => {
-    commandPromise = importCureList(dbFile, excelFile)
+  .action(async (dbFile, excelFile) => {
+    const code = await importCureList(dbFile, excelFile)
+    process.exit(code)
   })
 
 // Generate report command
@@ -70,36 +74,34 @@ program
     '-o, --output-file <outputFile>',
     'Write output to a file instead of stdout',
   )
-  .action((dbFile, options) => {
-    commandPromise = generateReport(dbFile, options.outputFile || null)
+  .action(async (dbFile, options) => {
+    const code = await generateReport(dbFile, options.outputFile || null)
+    process.exit(code)
   })
 
 // Purge contributions command
 program
   .command('purge-contributions <dbFile>')
   .description('Purge contributions data from db')
-  .action((dbFile) => {
-    commandPromise = purgeContributions(dbFile)
+  .action(async (dbFile) => {
+    const code = await purgeContributions(dbFile)
+    process.exit(code)
   })
 
-// Parse the command line arguments
-program.parse(process.argv)
+// Custom parsing logic for the command line arguments
+const args = process.argv.slice(2)
 
-//console.log('Program args:', JSON.stringify(program.args))
+if (args.length === 0) {
+  // No commands provided, launch the GUI
+  //console.log('Launching GUI.')
+  const electronPath = path.join(__dirname, 'node_modules/electron/dist/electron')
+  const electronAppPath = path.resolve(__dirname, '.')
 
-// Determine if program is intended to be run as GUI or CLI.
-if (commandPromise && program.args.length > 0) {
-  // CLI intended. At this point in execution, processing is complete?
-  //process.exit(0)
-  await commandPromise.then((result) => process.exit(result))
+  const child = spawn(electronPath, [electronAppPath], { stdio: 'inherit' })
+  child.on('close', (code) => {
+    process.exit(code)
+  })
+} else {
+  // Run the CLI commands
+  program.parse(process.argv)
 }
-
-// Launch the Electron GUI if no CLI command is provided
-const electronPath = path.join(__dirname, 'node_modules/electron/dist/electron') // Direct path to Electron executable
-const electronAppPath = path.resolve(__dirname, '.')
-
-const child = spawn(electronPath, [electronAppPath])
-
-child.on('close', (code) => {
-  process.exit(code)
-})
