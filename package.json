@@ -2,7 +2,7 @@
   "name": "cure-contributors",
   "productName": "cure-contributors",
   "version": "1.0.0",
-  "type": "commonjs",
+  "type": "module",
   "description": "Generate reports of campaign contributions by cure list voters.",
   "main": "src/index.js",
   "scripts": {
