@@ -7,6 +7,7 @@ if (started) {
   app.quit();
 }
 
+// Electron GUI entry point
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({

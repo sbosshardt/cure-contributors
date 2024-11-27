@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+
+const { spawn } = require('child_process');
+const path = require('node:path');
+const { Command } = require('commander');
+const { purgeCureList } = require('./src/tasks');
+const packageJson = require('./package.json');
+
+// Create CLI parser
+const program = new Command();
+
+program
+  .version(packageJson.version, '-v, --version', 'Output the current version')
+  .description('Cure Contributors: An example Electron app with CLI support')
+  .option('--purge-cure-list', 'Purge the cure list')
+  .helpCommand(true); // Ensures the default help command is available
+
+program.parse(process.argv);
+const options = program.opts();
+
+// Handle CLI commands
+if (options.purgeCureList) {
+  purgeCureList().then(() => process.exit(0));
+} else {
+  // Launch the Electron GUI if no CLI command is provided
+  const electronPath = require('electron');
+  const electronAppPath = path.join(__dirname, '.'); // Path to your Electron app
+
+  const child = spawn(electronPath, [electronAppPath], { stdio: 'inherit' });
+  child.on('close', (code) => process.exit(code));
+}
