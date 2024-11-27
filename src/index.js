@@ -53,12 +53,13 @@ const createWindow = () => {
     }
   })
 
-  // and load the index.html of the app. (modified for Next.js)
-  const serveNextApp = app.isPackaged
-    ? `file://${path.join(__dirname, '../out/index.html')}`
-    : 'http://localhost:3000'
+  // Load the index.html of the app. (modified for Next.js)
+  const isDev = !app.isPackaged
+  const appURL = isDev
+    ? 'http://localhost:3000' // Development: use Next.js dev server
+    : `file://${path.join(__dirname, '../out/index.html')}` // Production: use static files
 
-  mainWindow.loadURL(serveNextApp)
+  mainWindow.loadURL(appURL)
 }
 
 // This method will be called when Electron has finished
