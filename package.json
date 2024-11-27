@@ -2,7 +2,8 @@
   "name": "cure-contributors",
   "productName": "cure-contributors",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "type": "commonjs",
+  "description": "Generate reports of campaign contributions by cure list voters.",
   "main": "src/index.js",
   "scripts": {
     "start": "electron-forge start",
