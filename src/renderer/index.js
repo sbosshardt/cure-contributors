@@ -1,12 +1,6 @@
 import { app, BrowserWindow, screen } from 'electron'
-import path from 'node:path'
-import { fileURLToPath } from 'url'
 import started from 'electron-squirrel-startup'
-import preferences from './preferences.js'
-
-// Recreate __dirname for ES modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+import preferences from '../preferences.js'
 
 let mainWindow
 
@@ -42,7 +36,8 @@ const createWindow = () => {
     x: windowBounds.x,
     y: windowBounds.y,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      /*global MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY*/
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
     },
   })
 
@@ -53,13 +48,9 @@ const createWindow = () => {
     }
   })
 
-  // Load the index.html of the app. (modified for Next.js)
-  const isDev = !app.isPackaged
-  const appURL = isDev
-    ? 'http://localhost:3000' // Development: use Next.js dev server
-    : `file://${path.join(__dirname, 'out/index.html')}` // Production: Static files
-
-  mainWindow.loadURL(appURL)
+  // Load the index.html of the app.
+  /*global MAIN_WINDOW_WEBPACK_ENTRY*/
+  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY)
 }
 
 // This method will be called when Electron has finished

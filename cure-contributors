@@ -14,11 +14,10 @@ import {
   purgeContributions,
 } from './src/tasks.js'
 
-// Recreate __dirname for ES modules
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const filePath = fileURLToPath(import.meta.url)
+const dirName = path.dirname(filePath)
 
-const packageJsonPath = path.join(__dirname, 'package.json')
+const packageJsonPath = path.join(dirName, 'package.json')
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
 
 // Create CLI parser
@@ -94,8 +93,8 @@ const args = process.argv.slice(2)
 if (args.length === 0) {
   // No commands provided, launch the GUI
   //console.log('Launching GUI.')
-  const electronPath = path.join(__dirname, 'node_modules/electron/dist/electron')
-  const electronAppPath = path.resolve(__dirname, '.')
+  const electronPath = path.join(dirName, 'node_modules/electron/dist/electron')
+  const electronAppPath = path.resolve(dirName, '.')
 
   const child = spawn(electronPath, [electronAppPath], { stdio: 'inherit' })
   child.on('close', (code) => {

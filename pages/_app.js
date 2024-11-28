@@ -1,7 +1,11 @@
 import PropTypes from 'prop-types'
 import 'bootstrap/dist/css/bootstrap.min.css'
+//import { hot } from 'react-hot-loader'
 
-export default function MyApp({ Component, pageProps }) {
+// Based on: https://www.electronforge.io/config/plugins/webpack
+//const preloadPath = window.electron.getPreloadPath();
+
+const MyApp = ({ Component, pageProps }) => {
   return <Component {...pageProps} />
 }
 
@@ -9,3 +13,6 @@ MyApp.propTypes = {
   Component: PropTypes.elementType.isRequired,
   pageProps: PropTypes.object.isRequired,
 }
+
+//export default hot(module)(MyApp)
+export default MyApp

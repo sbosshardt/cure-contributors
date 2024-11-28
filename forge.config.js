@@ -26,6 +26,28 @@ const config = {
   ],
   plugins: [
     {
+      // Don't forget to maintain package.json to be consistent
+      // with changes you make here.
+      name: '@electron-forge/plugin-webpack',
+      config: {
+        mainConfig: './webpack.main.config.cjs',
+        renderer: {
+          config: './webpack.renderer.config.cjs',
+          //nodeIntegration: true, // Implies `target: 'electron-renderer'` for all entry points
+          entryPoints: [
+            {
+              name: 'main_window',
+              html: './src/renderer/index.html',
+              js: './src/renderer/index.js',
+              preload: {
+                js: './src/preload.js',
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
       name: '@electron-forge/plugin-auto-unpack-natives',
       config: {},
     },

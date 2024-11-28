@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Generate reports of campaign contributions by cure list voters.",
-  "main": "src/index.js",
+  "main": ".webpack/main/index.cjs",
   "scripts": {
+    "clean": "rm -rf out .webpack",
     "start-ef": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
@@ -17,7 +18,34 @@
     "build": "next build",
     "start": "next start"
   },
+  "config": {
+    "forge": {
+      "plugins": [
+        {
+          "name": "@electron-forge/plugin-webpack",
+          "config": {
+            "mainConfig": "./webpack.main.config.cjs",
+            "renderer": {
+              "config": "./webpack.renderer.config.cjs",
+              "entryPoints": [
+                {
+                  "name": "main_window",
+                  "html": "./src/renderer/index.html",
+                  "js": "./src/renderer/index.js",
+                  "preload": {
+                    "js": "./src/preload.js"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
   "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-react": "^7.25.9",
     "@electron-forge/cli": "^7.6.0",
     "@electron-forge/maker-deb": "^7.6.0",
     "@electron-forge/maker-rpm": "^7.6.0",
@@ -25,14 +53,19 @@
     "@electron-forge/maker-zip": "^7.6.0",
     "@electron-forge/plugin-auto-unpack-natives": "^7.6.0",
     "@electron-forge/plugin-fuses": "^7.6.0",
+    "@electron-forge/plugin-webpack": "^7.6.0",
     "@electron/fuses": "^1.8.0",
     "@eslint/js": "^9.15.0",
+    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "babel-loader": "^9.2.1",
     "electron": "^33.2.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "globals": "^15.12.0",
-    "prettier": "^3.4.1"
+    "node-loader": "^2.1.0",
+    "prettier": "^3.4.1",
+    "webpack-node-externals": "^3.0.0"
   },
   "keywords": [],
   "author": {
@@ -44,10 +77,13 @@
     "@next/eslint-plugin-next": "^15.0.3",
     "bootstrap": "^5.3.3",
     "commander": "^12.1.0",
+    "crypto-browserify": "^3.12.1",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",
     "eslint-plugin-react": "^7.37.2",
     "next": "^15.0.3",
+    "node-polyfill-webpack-plugin": "^4.0.0",
+    "path-browserify": "^1.0.1",
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.6",
     "react-dom": "^18.3.1"
