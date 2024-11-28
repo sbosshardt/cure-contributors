@@ -57,7 +57,7 @@ const createWindow = () => {
   const isDev = !app.isPackaged
   const appURL = isDev
     ? 'http://localhost:3000' // Development: use Next.js dev server
-    : `file://${path.join(__dirname, '../out/index.html')}` // Production: use static files
+    : `file://${path.join(__dirname, 'out/index.html')}` // Production: Static files
 
   mainWindow.loadURL(appURL)
 }

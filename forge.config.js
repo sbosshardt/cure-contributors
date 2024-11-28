@@ -1,7 +1,7 @@
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
 
-const exports = {
+const config = {
   packagerConfig: {
     asar: true,
   },
@@ -19,10 +19,10 @@ const exports = {
       name: '@electron-forge/maker-deb',
       config: {},
     },
-    {
-      name: '@electron-forge/maker-rpm',
-      config: {},
-    },
+    // {
+    //   name: '@electron-forge/maker-rpm',
+    //   config: {},
+    // },
   ],
   plugins: [
     {
@@ -43,4 +43,4 @@ const exports = {
   ],
 }
 
-export default exports
+export default config
