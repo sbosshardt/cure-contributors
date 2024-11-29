@@ -159,19 +159,19 @@ const importCureList = async (dbFilename, excelFile) => {
 
     // Define column mapping (Excel header -> DB column)
     const columnMapping = {
-      'voter_id': [' av_id', 'voter_id'].map(h => h.toLowerCase()),
-      'party': ['party'].map(h => h.toLowerCase()),
-      'name': ['name'].map(h => h.toLowerCase()),
-      'mailed_to': ['mailed to'].map(h => h.toLowerCase()),
-      'city_raw': ['city', '     city'].map(h => h.toLowerCase()),
-      'phone': ['phone ', 'phone'].map(h => h.toLowerCase()),
+      'voter_id': ['av_id', 'voter_id'],
+      'party': ['party'],
+      'name': ['name'],
+      'mailed_to': ['mailed to'],
+      'city_raw': ['city'],
+      'phone': ['phone'],
     }
     
     // First, get the raw data with original headers
     const rows = XLSX.utils.sheet_to_json(sheet, {
       raw: false,
       defval: '',
-      header: 'A' // Use A1 notation to get raw headers
+      header: 'A'
     })
 
     if (rows.length === 0) {
@@ -183,7 +183,9 @@ const importCureList = async (dbFilename, excelFile) => {
     const headerRow = rows[0]
     const normalizedHeaders = {}
     Object.entries(headerRow).forEach(([key, value]) => {
-      normalizedHeaders[value.toLowerCase().trim()] = key
+      // Normalize by converting to lowercase and removing all extra spaces
+      const normalized = value.toLowerCase().trim()
+      normalizedHeaders[normalized] = key
     })
     console.log('Normalized headers:', normalizedHeaders)
 
@@ -191,11 +193,15 @@ const importCureList = async (dbFilename, excelFile) => {
     const headerToDbColumn = {}
     const columnToExcelKey = {}
     for (const [dbColumn, possibleHeaders] of Object.entries(columnMapping)) {
+      // Find matching header, ignoring spaces and case
       const matchedHeader = possibleHeaders.find(header => 
-        Object.keys(normalizedHeaders).includes(header)
+        Object.keys(normalizedHeaders).some(normalizedHeader => 
+          normalizedHeader === header.toLowerCase().trim()
+        )
       )
       if (matchedHeader) {
-        const excelKey = normalizedHeaders[matchedHeader]
+        const normalizedMatch = matchedHeader.toLowerCase().trim()
+        const excelKey = normalizedHeaders[normalizedMatch]
         headerToDbColumn[dbColumn] = excelKey
         columnToExcelKey[dbColumn] = excelKey
       }
