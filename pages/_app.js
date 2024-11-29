@@ -1,5 +1,6 @@
-import PropTypes from 'prop-types'
-import 'bootstrap/dist/css/bootstrap.min.css'
+const React = require('react')
+const PropTypes = require('prop-types')
+require('bootstrap/dist/css/bootstrap.min.css')
 //import { hot } from 'react-hot-loader'
 
 // Based on: https://www.electronforge.io/config/plugins/webpack
@@ -15,4 +16,5 @@ MyApp.propTypes = {
 }
 
 //export default hot(module)(MyApp)
-export default MyApp
+//export default MyApp
+module.exports = MyApp

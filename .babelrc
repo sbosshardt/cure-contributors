@@ -1,0 +1,11 @@
+{
+  "presets": [
+    ["next/babel", {
+      "preset-react": {
+        "runtime": "automatic",
+        "importSource": "react"
+      },
+      "transform-modules-commonjs": true
+    }]
+  ]
+}

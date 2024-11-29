@@ -50,7 +50,7 @@ const generateReport = async (dbFilename, outputFile) => {
   return 0
 }
 
-export {
+module.exports = {
   purgeContributions,
   createDb,
   resetDb,

@@ -1,10 +1,10 @@
-import globals from 'globals'
-import pluginJs from '@eslint/js'
-import pluginReact from 'eslint-plugin-react'
-import pluginNext from '@next/eslint-plugin-next'
+const globals = require('globals')
+const pluginJs = require('@eslint/js')
+const pluginReact = require('eslint-plugin-react')
+const pluginNext = require('@next/eslint-plugin-next')
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
-export default [
+module.exports = [
   {
     // Note: there should be no other properties in this object
     ignores: ['.next/*/*', 'out/*'],
@@ -23,6 +23,9 @@ export default [
       '@next/next': pluginNext,
     },
     rules: {
+      'no-unused-vars': ['error', { 
+        varsIgnorePattern: 'React',
+      }],
       indent: ['error', 2], // Enforce 2-space indentation
       semi: ['error', 'never'], // Disallow semicolons
       quotes: ['error', 'single'], // Enforce single quotes (optional)

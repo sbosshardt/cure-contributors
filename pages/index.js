@@ -1,6 +1,7 @@
-import { Button } from 'react-bootstrap'
+const React = require('react')
+const { Button } = require('react-bootstrap')
 
-export default function Home() {
+module.exports = function Home() {
   return (
     <div>
       <h1>Welcome to Cure Contributors</h1>

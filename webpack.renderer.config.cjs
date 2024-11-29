@@ -1,37 +1,28 @@
-const nodeExternals = require('webpack-node-externals')
 const rules = require('./webpack.rules.cjs')
-
-rules.push({
-  test: /\.css$/,
-  use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
-})
-
-rules.push({
-  test: /\.(js|jsx)$/,
-  exclude: /node_modules/,
-  use: {
-    loader: 'babel-loader', // Use Babel to transpile modern JS/TS
-  },
-})
-
+const path = require('path')
 
 module.exports = {
   target: 'electron-renderer',
-  externals: [
-    nodeExternals({
-      allowlist: [/^webpack\/hot/], // Allowlist necessary modules
-    }),
-  ],
-  resolve: {
-    extensions: ['.js', '.jsx', '.ts', '.tsx'],
-    fallback: {
-      fs: false, // Prevent Webpack from bundling fs (use Node.js built-in)
-      os: false,
-      path: false,
-    },
+  entry: './src/renderer/index.js',
+  output: {
+    path: path.join(__dirname, '.webpack/renderer'),
+    filename: 'index.js',
+    publicPath: './'
   },
-  // Put your normal webpack config below here
   module: {
-    rules,
+    rules: [
+      ...rules,
+      {
+        test: /\.css$/,
+        use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
+      }
+    ]
   },
+  resolve: {
+    extensions: ['.js', '.jsx', '.json'],
+    alias: {
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+    }
+  }
 }

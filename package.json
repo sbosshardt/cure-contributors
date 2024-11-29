@@ -2,11 +2,11 @@
   "name": "cure-contributors",
   "productName": "cure-contributors",
   "version": "1.0.0",
-  "type": "module",
+  "type": "commonjs",
   "description": "Generate reports of campaign contributions by cure list voters.",
-  "main": ".webpack/main/index.cjs",
+  "main": ".webpack/main",
   "scripts": {
-    "clean": "rm -rf out .webpack",
+    "clean": "rm -rf out .webpack dist",
     "start-ef": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
@@ -15,36 +15,16 @@
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "build": "npm run prebuild && npm run build-next && npm run build-electron",
+    "start": "next start",
+    "build-next": "next build",
+    "build-electron": "electron-forge make",
+    "prebuild": "npm run clean && mkdir -p dist/next"
   },
-  "config": {
-    "forge": {
-      "plugins": [
-        {
-          "name": "@electron-forge/plugin-webpack",
-          "config": {
-            "mainConfig": "./webpack.main.config.cjs",
-            "renderer": {
-              "config": "./webpack.renderer.config.cjs",
-              "entryPoints": [
-                {
-                  "name": "main_window",
-                  "html": "./src/renderer/index.html",
-                  "js": "./src/renderer/index.js",
-                  "preload": {
-                    "js": "./src/preload.js"
-                  }
-                }
-              ]
-            }
-          }
-        }
-      ]
-    }
-  },
+  "config": {},
   "devDependencies": {
     "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
     "@babel/preset-react": "^7.25.9",
     "@electron-forge/cli": "^7.6.0",
     "@electron-forge/maker-deb": "^7.6.0",
@@ -56,8 +36,10 @@
     "@electron-forge/plugin-webpack": "^7.6.0",
     "@electron/fuses": "^1.8.0",
     "@eslint/js": "^9.15.0",
-    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "@vercel/webpack-asset-relocator-loader": "1.7.3",
     "babel-loader": "^9.2.1",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^7.1.2",
     "electron": "^33.2.0",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^9.1.0",
@@ -65,6 +47,7 @@
     "globals": "^15.12.0",
     "node-loader": "^2.1.0",
     "prettier": "^3.4.1",
+    "style-loader": "^4.0.0",
     "webpack-node-externals": "^3.0.0"
   },
   "keywords": [],
@@ -75,17 +58,49 @@
   "license": "MIT",
   "dependencies": {
     "@next/eslint-plugin-next": "^15.0.3",
+    "@restart/ui": "^1.4.1",
     "bootstrap": "^5.3.3",
     "commander": "^12.1.0",
+    "conf": "^13.0.1",
     "crypto-browserify": "^3.12.1",
     "electron-squirrel-startup": "^1.0.1",
-    "electron-store": "^10.0.0",
+    "electron-store": "^8.1.0",
     "eslint-plugin-react": "^7.37.2",
+    "find-up": "^7.0.0",
+    "is-obj": "^3.0.0",
+    "locate-path": "^7.2.0",
+    "mimic-fn": "^4.0.0",
     "next": "^15.0.3",
     "node-polyfill-webpack-plugin": "^4.0.0",
+    "p-limit": "^6.1.0",
+    "p-locate": "^6.0.0",
     "path-browserify": "^1.0.1",
-    "react": "^18.3.1",
-    "react-bootstrap": "^2.10.6",
-    "react-dom": "^18.3.1"
+    "path-exists": "^5.0.0",
+    "react": "^18.2.0",
+    "react-bootstrap": "^2.10.1",
+    "react-dom": "^18.2.0",
+    "yocto-queue": "^1.1.1"
+  },
+  "overrides": {
+    "@restart/ui": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0"
+    },
+    "react-bootstrap": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0"
+    },
+    "next": {
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0"
+    }
+  },
+  "build": {
+    "extraResources": [
+      {
+        "from": "node_modules/electron-store/",
+        "to": "node_modules/electron-store/"
+      }
+    ]
   }
 }
