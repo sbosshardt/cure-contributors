@@ -51,6 +51,7 @@ const generateReport = async (dbFilename, outputFile) => {
 }
 
 function handleCliCommands(args) {
+  const { Command } = require('commander')
   const program = new Command()
 
   // Set up your commands

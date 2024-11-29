@@ -7,7 +7,7 @@ const nextConfig = {
   },
   assetPrefix: './',
   reactStrictMode: true,
-  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+  webpack: (config) => {
     // Ensure React is properly handled
     config.resolve = {
       ...config.resolve,

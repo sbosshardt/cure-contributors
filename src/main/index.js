@@ -11,7 +11,7 @@ const preferences = require('../preferences.js')
 const isForceGui = process.env.FORCE_GUI === '1'
 
 // Only run GUI code if we're in electron context or being forced
-if (process.versions.hasOwnProperty('electron') || isForceGui) {
+if (Object.hasOwn(process.versions, 'electron') || isForceGui) {
   let mainWindow
 
   const createWindow = () => {
@@ -36,6 +36,7 @@ if (process.versions.hasOwnProperty('electron') || isForceGui) {
     const windowBounds = savedBounds || centeredBounds
 
     // Create the browser window.
+    /*global MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY*/
     mainWindow = new BrowserWindow({
       width: windowBounds.width,
       height: windowBounds.height,
@@ -56,6 +57,7 @@ if (process.versions.hasOwnProperty('electron') || isForceGui) {
     })
 
     // Load the index.html of the app.
+    /*global MAIN_WINDOW_WEBPACK_ENTRY*/
     mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY).catch((err) => {
       console.error('Failed to load window:', err)
     })
