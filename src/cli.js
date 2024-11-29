@@ -9,20 +9,25 @@ const { spawn } = require('child_process')
 if (process.argv.length <= 2) {
   // Check if we're running the development version
   const isDev = process.argv[1].startsWith('.')
-  
+
   if (isDev) {
     // Development: Use electron-forge start
     const projectRoot = path.resolve(__dirname, '..')
-    const electronForge = path.join(projectRoot, 'node_modules', '.bin', 'electron-forge')
-    
+    const electronForge = path.join(
+      projectRoot,
+      'node_modules',
+      '.bin',
+      'electron-forge',
+    )
+
     const child = spawn(electronForge, ['start'], {
       stdio: 'inherit',
       env: {
         ...process.env,
         ELECTRON_ENABLE_LOGGING: 1,
-        FORCE_GUI: '1'
+        FORCE_GUI: '1',
       },
-      cwd: projectRoot
+      cwd: projectRoot,
     })
 
     child.on('error', (err) => {
@@ -36,14 +41,14 @@ if (process.argv.length <= 2) {
   } else {
     // Production: Launch the installed electron app
     const electronExecutable = '/usr/lib/cure-contributors/cure-contributors'
-    
+
     const child = spawn(electronExecutable, [], {
       stdio: 'inherit',
       env: {
         ...process.env,
         ELECTRON_ENABLE_LOGGING: 1,
-        FORCE_GUI: '1'
-      }
+        FORCE_GUI: '1',
+      },
     })
 
     child.on('error', (err) => {
@@ -57,11 +62,13 @@ if (process.argv.length <= 2) {
   }
 } else {
   const program = new Command()
-  
+
   program
     .name('cure-contributors')
     .version(require('../package.json').version)
-    .description('Generate reports of campaign contributions by cure list voters.')
+    .description(
+      'Generate reports of campaign contributions by cure list voters.',
+    )
 
   program
     .command('create-db')
@@ -105,9 +112,15 @@ if (process.argv.length <= 2) {
     .command('generate-report')
     .argument('<dbFile>', 'Database file to generate report from')
     .description('Generate a report based on the database')
-    .option('-o, --output-file <outputFile>', 'Write output to a file instead of stdout')
+    .option(
+      '-o, --output-file <outputFile>',
+      'Write output to a file instead of stdout',
+    )
     .action(async (dbFile, options) => {
-      const code = await tasks.generateReport(dbFile, options.outputFile || null)
+      const code = await tasks.generateReport(
+        dbFile,
+        options.outputFile || null,
+      )
       process.exit(code)
     })
 

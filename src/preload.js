@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electron', {
-  getPreloadPath: () => ipcRenderer.sendSync('get-preload-path')
+  getPreloadPath: () => ipcRenderer.sendSync('get-preload-path'),
 })
 
 // See the Electron documentation for details on how to use preload scripts:

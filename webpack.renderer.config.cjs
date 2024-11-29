@@ -7,7 +7,7 @@ module.exports = {
   output: {
     path: path.join(__dirname, '.webpack/renderer'),
     filename: 'index.js',
-    publicPath: './'
+    publicPath: './',
   },
   module: {
     rules: [
@@ -15,14 +15,14 @@ module.exports = {
       {
         test: /\.css$/,
         use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
-      }
-    ]
+      },
+    ],
   },
   resolve: {
     extensions: ['.js', '.jsx', '.json'],
     alias: {
-      'react': path.resolve(__dirname, 'node_modules/react'),
+      react: path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-    }
-  }
+    },
+  },
 }

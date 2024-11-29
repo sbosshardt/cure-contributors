@@ -8,14 +8,14 @@ class Preferences {
         defaults: {
           theme: 'light',
         },
-        clearInvalidConfig: true
+        clearInvalidConfig: true,
       })
     } catch (err) {
       console.error('Failed to initialize electron-store:', err)
       this.store = {
         get: () => null,
         set: () => {},
-        delete: () => {}
+        delete: () => {},
       }
     }
   }

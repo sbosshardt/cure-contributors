@@ -7,17 +7,17 @@ module.exports = {
   target: 'node',
   output: {
     path: path.join(__dirname, 'dist'),
-    filename: 'cure-contributors'
+    filename: 'cure-contributors',
   },
   plugins: [
     new webpack.BannerPlugin({
       banner: '#!/usr/bin/env node',
       raw: true,
-      entryOnly: true
-    })
+      entryOnly: true,
+    }),
   ],
   externals: {
-    electron: 'electron'
+    electron: 'electron',
   },
   module: {
     rules: [
@@ -25,9 +25,9 @@ module.exports = {
         test: /\.js$/,
         exclude: /node_modules/,
         use: {
-          loader: 'babel-loader'
-        }
-      }
-    ]
-  }
+          loader: 'babel-loader',
+        },
+      },
+    ],
+  },
 }

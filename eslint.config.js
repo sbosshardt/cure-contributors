@@ -23,15 +23,17 @@ module.exports = [
       '@next/next': pluginNext,
     },
     rules: {
-      'no-unused-vars': ['error', { 
-        varsIgnorePattern: 'React',
-      }],
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: 'React',
+        },
+      ],
       indent: ['error', 2], // Enforce 2-space indentation
       semi: ['error', 'never'], // Disallow semicolons
       quotes: ['error', 'single'], // Enforce single quotes (optional)
       'no-console': 'off', // Allow console statements
     },
-
   },
   pluginJs.configs.recommended,
   pluginReact.configs.flat.recommended,

@@ -24,8 +24,12 @@ if (process.versions.hasOwnProperty('electron') || isForceGui) {
     const centeredBounds = {
       width: defaultWidth,
       height: defaultHeight,
-      x: Math.floor((display.bounds.width - defaultWidth) / 2 + display.bounds.x),
-      y: Math.floor((display.bounds.height - defaultHeight) / 2 + display.bounds.y),
+      x: Math.floor(
+        (display.bounds.width - defaultWidth) / 2 + display.bounds.x,
+      ),
+      y: Math.floor(
+        (display.bounds.height - defaultHeight) / 2 + display.bounds.y,
+      ),
     }
 
     // Use saved bounds if they exist, otherwise center the window
@@ -52,13 +56,16 @@ if (process.versions.hasOwnProperty('electron') || isForceGui) {
     })
 
     // Load the index.html of the app.
-    mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY).catch(err => {
+    mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY).catch((err) => {
       console.error('Failed to load window:', err)
     })
 
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-      console.error('Window failed to load:', errorCode, errorDescription)
-    })
+    mainWindow.webContents.on(
+      'did-fail-load',
+      (event, errorCode, errorDescription) => {
+        console.error('Window failed to load:', errorCode, errorDescription)
+      },
+    )
   }
 
   app.whenReady().then(createWindow)

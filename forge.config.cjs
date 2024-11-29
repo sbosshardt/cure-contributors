@@ -2,7 +2,7 @@ module.exports = {
   packagerConfig: {
     asar: true,
     extraResource: ['./dist/cure-contributors'],
-    executableName: 'cure-contributors'
+    executableName: 'cure-contributors',
   },
   rebuildConfig: {},
   makers: [
@@ -21,13 +21,13 @@ module.exports = {
           bin: './resources/cure-contributors',
           scripts: {
             postinst: './scripts/postinst.sh',
-            prerm: './scripts/prerm.sh'
+            prerm: './scripts/prerm.sh',
           },
           chmod: {
-            'resources/cure-contributors': '755'
-          }
-        }
-      }
+            'resources/cure-contributors': '755',
+          },
+        },
+      },
     },
   ],
   plugins: [
@@ -43,14 +43,14 @@ module.exports = {
               js: './src/renderer/index.js',
               name: 'main_window',
               preload: {
-                js: './src/preload.js'
-              }
-            }
-          ]
+                js: './src/preload.js',
+              },
+            },
+          ],
         },
-        devContentSecurityPolicy: "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' data:"
-      }
-    }
-  ]
+        devContentSecurityPolicy:
+          "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' data:",
+      },
+    },
+  ],
 }
-
