@@ -1,6 +1,7 @@
 const path = require('path')
 const Database = require('better-sqlite3')
 const fs = require('fs')
+const XLSX = require('xlsx-js-style')
 
 const purgeContributions = async (dbFilename) => {
   console.log(
@@ -111,12 +112,98 @@ const importContributions = async (dbFilename, csvFilenames) => {
   return 0
 }
 
-const importCureList = async (dbFilename, excelFilename) => {
-  console.log(
-    `In importCureList. Parameters passed to function: excelFilename=${excelFilename}, dbFilename=${dbFilename}`,
-  )
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+const importCureList = async (dbFilename, excelFile) => {
+  try {
+    // Ensure we have absolute paths
+    const dbPath = path.resolve(dbFilename)
+    const excelPath = path.resolve(excelFile)
+    
+    console.log(`Importing cure list from ${excelPath} into ${dbPath}`)
+
+    // Read the Excel file
+    const workbook = XLSX.readFile(excelPath)
+    
+    // Get the first sheet
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    
+    // Convert to JSON with header mapping
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      raw: false, // Convert everything to strings
+      defval: '', // Default value for empty cells
+      header: [
+        'voter_id',
+        'party',
+        'name',
+        'mailed_to',
+        'city',
+        'phone',
+        'zip_code',
+        'last_name',
+        'first_name'
+      ]
+    })
+
+    // Open database connection
+    const db = new Database(dbPath)
+
+    try {
+      // Begin transaction
+      db.prepare('BEGIN').run()
+
+      // Prepare insert statement
+      const insert = db.prepare(`
+        INSERT INTO cure_list_voters (
+          voter_id,
+          party,
+          name,
+          mailed_to,
+          city,
+          phone,
+          zip_code,
+          last_name,
+          first_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      // Skip header row if it exists (check if first row contains headers)
+      const startIndex = rows[0].voter_id.toLowerCase() === 'voter_id' ? 1 : 0
+
+      // Insert each row
+      let importedCount = 0
+      for (let i = startIndex; i < rows.length; i++) {
+        const row = rows[i]
+        insert.run(
+          row.voter_id,
+          row.party,
+          row.name,
+          row.mailed_to,
+          row.city,
+          row.phone,
+          row.zip_code,
+          row.last_name,
+          row.first_name
+        )
+        importedCount++
+      }
+
+      // Commit transaction
+      db.prepare('COMMIT').run()
+
+      console.log(`Successfully imported ${importedCount} voters`)
+      return 0 // Success
+    } catch (error) {
+      // Rollback on error
+      db.prepare('ROLLBACK').run()
+      throw error
+    } finally {
+      // Close database connection
+      db.close()
+    }
+  } catch (error) {
+    console.error('Error importing cure list:', error)
+    return 1 // Error
+  }
 }
 
 const generateReport = async (dbFilename, outputFile) => {
