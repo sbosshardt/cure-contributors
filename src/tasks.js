@@ -1,3 +1,6 @@
+const path = require('path')
+const Database = require('better-sqlite3')
+
 const purgeContributions = async (dbFilename) => {
   console.log(
     `In purgeContributions. Parameters passed to function: dbFilename=${dbFilename}`,
@@ -10,12 +13,65 @@ const purgeContributions = async (dbFilename) => {
 
 // Add more shared tasks as needed
 const createDb = async (dbFilename) => {
-  console.log(
-    `In createDb. Parameters passed to function: dbFilename=${dbFilename}`,
-  )
+  try {
+    // Ensure we have an absolute path
+    const dbPath = path.resolve(dbFilename)
+    console.log(`Creating/opening database at: ${dbPath}`)
 
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+    // Open the database (creates it if it doesn't exist)
+    const db = new Database(dbPath)
+
+    // Create tables if they don't exist
+    db.exec(`
+      -- Contributions table matching CSV structure
+      CREATE TABLE IF NOT EXISTS contributions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        committee_id TEXT,
+        committee_name TEXT,
+        transaction_id TEXT,
+        file_number TEXT,
+        contributor_first_name TEXT,
+        contributor_last_name TEXT,
+        contributor_street_1 TEXT,
+        contributor_city TEXT,
+        contributor_state TEXT,
+        contributor_zip TEXT,
+        contribution_receipt_date DATE,
+        contribution_receipt_amount DECIMAL(10,2),
+        link_id TEXT,
+        memo_text TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Cure list voters table
+      CREATE TABLE IF NOT EXISTS cure_list_voters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        voter_name TEXT NOT NULL,
+        voter_zip TEXT,
+        ballot_status TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Create indexes for faster lookups
+      CREATE INDEX IF NOT EXISTS idx_contributor_name 
+        ON contributions(contributor_first_name, contributor_last_name);
+      CREATE INDEX IF NOT EXISTS idx_contributor_zip 
+        ON contributions(contributor_zip);
+      CREATE INDEX IF NOT EXISTS idx_voter_name 
+        ON cure_list_voters(voter_name);
+      CREATE INDEX IF NOT EXISTS idx_voter_zip 
+        ON cure_list_voters(voter_zip);
+    `)
+
+    // Close the database connection
+    db.close()
+
+    console.log('Database created/verified successfully')
+    return 0 // Success
+  } catch (error) {
+    console.error('Error creating database:', error)
+    return 1 // Error
+  }
 }
 
 const resetDb = async (dbFilename) => {

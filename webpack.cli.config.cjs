@@ -18,6 +18,7 @@ module.exports = {
   ],
   externals: {
     electron: 'electron',
+    'better-sqlite3': 'commonjs better-sqlite3'
   },
   module: {
     rules: [

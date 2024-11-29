@@ -93,3 +93,6 @@ out/
 
 #built files
 dist/
+
+# SQLite database
+*.db

@@ -66,6 +66,7 @@
   "dependencies": {
     "@next/eslint-plugin-next": "^15.0.3",
     "@restart/ui": "^1.4.1",
+    "better-sqlite3": "^11.6.0",
     "bootstrap": "^5.3.3",
     "commander": "^12.1.0",
     "conf": "^13.0.1",
