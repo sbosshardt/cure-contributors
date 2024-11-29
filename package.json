@@ -72,6 +72,7 @@
     "commander": "^12.1.0",
     "conf": "^13.0.1",
     "crypto-browserify": "^3.12.1",
+    "csv-parser": "^3.0.0",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^8.1.0",
     "eslint-plugin-react": "^7.37.2",
