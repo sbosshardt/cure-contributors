@@ -112,6 +112,20 @@ const importContributions = async (dbFilename, csvFilenames) => {
   return 0
 }
 
+// Helper function to extract ZIP code from city string
+const extractZipCode = (cityStr) => {
+  const match = cityStr.match(/\b\d{5}\b/)
+  return match ? match[0] : ''
+}
+
+// Helper function to clean city string (remove ZIP and state)
+const cleanCity = (cityStr) => {
+  return cityStr
+    .replace(/\b\d{5}(-\d{4})?\b/, '') // Remove ZIP code
+    .replace(/\s+[A-Z]{2}\s*$/, '')    // Remove state code
+    .trim()
+}
+
 const importCureList = async (dbFilename, excelFile) => {
   try {
     // Ensure we have absolute paths
@@ -126,23 +140,52 @@ const importCureList = async (dbFilename, excelFile) => {
     // Get the first sheet
     const sheetName = workbook.SheetNames[0]
     const sheet = workbook.Sheets[sheetName]
+
+    // Define column mapping (Excel header -> DB column)
+    const columnMapping = {
+      'voter_id': [' av_id', 'voter_id'].map(h => h.toLowerCase()),
+      'party': ['party'].map(h => h.toLowerCase()),
+      'name': ['name'].map(h => h.toLowerCase()),
+      'mailed_to': ['mailed to'].map(h => h.toLowerCase()),
+      'city_raw': ['city', '     city'].map(h => h.toLowerCase()),
+      'phone': ['phone '].map(h => h.toLowerCase()),
+    }
     
-    // Convert to JSON with header mapping
+    // First, get the raw data with original headers
     const rows = XLSX.utils.sheet_to_json(sheet, {
-      raw: false, // Convert everything to strings
-      defval: '', // Default value for empty cells
-      header: [
-        'voter_id',
-        'party',
-        'name',
-        'mailed_to',
-        'city',
-        'phone',
-        'zip_code',
-        'last_name',
-        'first_name'
-      ]
+      raw: false,
+      defval: '',
+      header: 'A' // Use A1 notation to get raw headers
     })
+
+    if (rows.length === 0) {
+      console.error('No data found in Excel file')
+      return 1
+    }
+
+    // Get headers from first row and normalize them
+    const headerRow = rows[0]
+    const normalizedHeaders = {}
+    Object.entries(headerRow).forEach(([key, value]) => {
+      normalizedHeaders[value.toLowerCase().trim()] = key
+    })
+    console.log('Normalized headers:', normalizedHeaders)
+
+    // Create a mapping from Excel columns to DB columns
+    const headerToDbColumn = {}
+    const columnToExcelKey = {}
+    for (const [dbColumn, possibleHeaders] of Object.entries(columnMapping)) {
+      const matchedHeader = possibleHeaders.find(header => 
+        Object.keys(normalizedHeaders).includes(header)
+      )
+      if (matchedHeader) {
+        const excelKey = normalizedHeaders[matchedHeader]
+        headerToDbColumn[dbColumn] = excelKey
+        columnToExcelKey[dbColumn] = excelKey
+      }
+    }
+
+    console.log('Column mapping:', columnToExcelKey)
 
     // Open database connection
     const db = new Database(dbPath)
@@ -151,8 +194,8 @@ const importCureList = async (dbFilename, excelFile) => {
       // Begin transaction
       db.prepare('BEGIN').run()
 
-      // Prepare insert statement
-      const insert = db.prepare(`
+      // Create insert statement with all fields
+      const insertSql = `
         INSERT INTO cure_list_voters (
           voter_id,
           party,
@@ -160,30 +203,46 @@ const importCureList = async (dbFilename, excelFile) => {
           mailed_to,
           city,
           phone,
-          zip_code,
-          last_name,
-          first_name
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
+          zip_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+      console.log('SQL:', insertSql)
 
-      // Skip header row if it exists (check if first row contains headers)
-      const startIndex = rows[0].voter_id.toLowerCase() === 'voter_id' ? 1 : 0
+      const insert = db.prepare(insertSql)
 
-      // Insert each row
+      // Insert each row (skipping header)
       let importedCount = 0
-      for (let i = startIndex; i < rows.length; i++) {
+      for (let i = 1; i < rows.length; i++) {
         const row = rows[i]
-        insert.run(
-          row.voter_id,
-          row.party,
-          row.name,
-          row.mailed_to,
-          row.city,
-          row.phone,
-          row.zip_code,
-          row.last_name,
-          row.first_name
-        )
+        
+        // Extract city and ZIP from the combined field
+        const cityField = row[headerToDbColumn['city_raw']] || ''
+        const zipCode = extractZipCode(cityField)
+        const city = cleanCity(cityField)
+
+        // Debug: show the first data row
+        if (importedCount === 0) {
+          console.log('First row data:', row)
+          console.log('Raw city field:', cityField)
+          console.log('Extracted city:', city)
+          console.log('Extracted ZIP:', zipCode)
+        }
+
+        const values = [
+          row[headerToDbColumn['voter_id']] || '',
+          row[headerToDbColumn['party']] || '',
+          row[headerToDbColumn['name']] || '',
+          row[headerToDbColumn['mailed_to']] || '',
+          city,
+          row[headerToDbColumn['phone']] || '',
+          zipCode
+        ].map(val => val.toString().trim())
+        
+        if (importedCount === 0) {
+          console.log('Extracted values:', values)
+        }
+        
+        insert.run(...values)
         importedCount++
       }
 
