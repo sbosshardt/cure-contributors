@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "format": "prettier --write .",
+    "prettier": "prettier --write .",
     "dev": "next dev",
     "build": "npm run build-cli && npm run build-electron",
     "start": "electron-forge start",

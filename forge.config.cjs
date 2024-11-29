@@ -48,8 +48,10 @@ module.exports = {
             },
           ],
         },
+        /* eslint-disable quotes */
         devContentSecurityPolicy:
-          'default-src \'self\' \'unsafe-inline\' data:; script-src \'self\' \'unsafe-eval\' \'unsafe-inline\' data:',
+          "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' data:",
+        /* eslint-enable quotes */
       },
     },
   ],

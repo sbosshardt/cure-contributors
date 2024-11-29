@@ -36,13 +36,17 @@ class DatabaseManager {
 
   // Utility method to check if database exists and has correct schema
   validateSchema() {
-    return this.withConnection(db => {
-      const tables = db.prepare(`
+    return this.withConnection((db) => {
+      const tables = db
+        .prepare(
+          `
         SELECT name FROM sqlite_master 
         WHERE type='table' 
         AND name IN ('contributions', 'cure_list_voters')
-      `).all()
-      
+      `,
+        )
+        .all()
+
       return tables.length === 2
     })
   }

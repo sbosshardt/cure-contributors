@@ -87,7 +87,7 @@ const resetDb = async (dbFilename) => {
   try {
     // Ensure we have an absolute path
     const dbPath = path.resolve(dbFilename)
-    
+
     // Delete the file if it exists
     if (fs.existsSync(dbPath)) {
       console.log(`Deleting existing database at: ${dbPath}`)
