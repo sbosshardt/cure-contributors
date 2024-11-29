@@ -9,7 +9,7 @@ const purgeContributions = async (dbFilename) => {
   try {
     const dbPath = path.resolve(dbFilename)
     console.log(`Purging all contributions from database: ${dbPath}`)
-    
+
     db = new Database(dbPath)
 
     // Begin transaction
@@ -18,7 +18,7 @@ const purgeContributions = async (dbFilename) => {
     try {
       // Delete all records
       const result = db.prepare('DELETE FROM contributions').run()
-      
+
       // Commit transaction
       db.prepare('COMMIT').run()
 
@@ -132,9 +132,11 @@ const importContributions = async (dbFilename, csvFilenames) => {
   let db = null
   try {
     const dbPath = path.resolve(dbFilename)
-    const csvPaths = csvFilenames.map(f => path.resolve(f))
-    
-    console.log(`Importing contributions from ${csvPaths.length} files into ${dbPath}`)
+    const csvPaths = csvFilenames.map((f) => path.resolve(f))
+
+    console.log(
+      `Importing contributions from ${csvPaths.length} files into ${dbPath}`,
+    )
     db = new Database(dbPath)
 
     let totalImported = 0
@@ -142,7 +144,7 @@ const importContributions = async (dbFilename, csvFilenames) => {
     // Process each CSV file
     for (const csvPath of csvPaths) {
       console.log(`Processing ${csvPath}`)
-      
+
       // Begin transaction for this file
       db.prepare('BEGIN').run()
 
@@ -166,7 +168,7 @@ const importContributions = async (dbFilename, csvFilenames) => {
       `
       const insert = db.prepare(insertSql)
       let fileImported = 0
-      
+
       // Process the file using csv-parser
       await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
@@ -188,11 +190,12 @@ const importContributions = async (dbFilename, csvFilenames) => {
               row.contributor_city || '',
               row.contributor_state || '',
               row.contributor_zip || '',
-              row.contribution_receipt_date ? 
-                row.contribution_receipt_date.split(' ')[0] : null,
+              row.contribution_receipt_date
+                ? row.contribution_receipt_date.split(' ')[0]
+                : null,
               parseFloat(row.contribution_receipt_amount) || 0.0,
               row.link_id || '',
-              row.memo_text || ''
+              row.memo_text || '',
             ]
 
             // Insert the row
@@ -200,7 +203,9 @@ const importContributions = async (dbFilename, csvFilenames) => {
             fileImported++
           })
           .on('end', () => {
-            console.log(`Imported ${fileImported} contributions from ${path.basename(csvPath)}`)
+            console.log(
+              `Imported ${fileImported} contributions from ${path.basename(csvPath)}`,
+            )
             totalImported += fileImported
             resolve()
           })
@@ -232,7 +237,7 @@ const extractZipCode = (cityStr) => {
 const cleanCity = (cityStr) => {
   return cityStr
     .replace(/\b\d{5}(-\d{4})?\b/, '') // Remove ZIP code
-    .replace(/\s+[A-Z]{2}\s*$/, '')    // Remove state code
+    .replace(/\s+[A-Z]{2}\s*$/, '') // Remove state code
     .trim()
 }
 
@@ -240,15 +245,17 @@ const cleanCity = (cityStr) => {
 const parseName = (fullName) => {
   // First, handle suffixes by removing them
   const withoutSuffix = fullName.replace(/ (JR|SR|II|III|IV|V),/, ',')
-  
+
   // Extract last name (first part before comma)
   const lastNameMatch = withoutSuffix.match(/^(?:[^ ,]+ )?([^ ,]+),/)
   const lastName = lastNameMatch ? lastNameMatch[1] : ''
-  
+
   // Extract first name (first word after comma)
-  const firstNameMatch = withoutSuffix.match(/^(?:[^ ,]+ ){0,3}[^ ,]+[, ]+([^, ]+)/)
+  const firstNameMatch = withoutSuffix.match(
+    /^(?:[^ ,]+ ){0,3}[^ ,]+[, ]+([^, ]+)/,
+  )
   const firstName = firstNameMatch ? firstNameMatch[1] : ''
-  
+
   return { firstName, lastName }
 }
 
@@ -257,31 +264,31 @@ const importCureList = async (dbFilename, excelFile) => {
     // Ensure we have absolute paths
     const dbPath = path.resolve(dbFilename)
     const excelPath = path.resolve(excelFile)
-    
+
     console.log(`Importing cure list from ${excelPath} into ${dbPath}`)
 
     // Read the Excel file
     const workbook = XLSX.readFile(excelPath)
-    
+
     // Get the first sheet
     const sheetName = workbook.SheetNames[0]
     const sheet = workbook.Sheets[sheetName]
 
     // Define column mapping (Excel header -> DB column)
     const columnMapping = {
-      'voter_id': ['av_id', 'voter_id'],
-      'party': ['party'],
-      'name': ['name'],
-      'mailed_to': ['mailed to'],
-      'city_raw': ['city'],
-      'phone': ['phone'],
+      voter_id: ['av_id', 'voter_id'],
+      party: ['party'],
+      name: ['name'],
+      mailed_to: ['mailed to'],
+      city_raw: ['city'],
+      phone: ['phone'],
     }
-    
+
     // First, get the raw data with original headers
     const rows = XLSX.utils.sheet_to_json(sheet, {
       raw: false,
       defval: '',
-      header: 'A'
+      header: 'A',
     })
 
     if (rows.length === 0) {
@@ -304,10 +311,11 @@ const importCureList = async (dbFilename, excelFile) => {
     const columnToExcelKey = {}
     for (const [dbColumn, possibleHeaders] of Object.entries(columnMapping)) {
       // Find matching header, ignoring spaces and case
-      const matchedHeader = possibleHeaders.find(header => 
-        Object.keys(normalizedHeaders).some(normalizedHeader => 
-          normalizedHeader === header.toLowerCase().trim()
-        )
+      const matchedHeader = possibleHeaders.find((header) =>
+        Object.keys(normalizedHeaders).some(
+          (normalizedHeader) =>
+            normalizedHeader === header.toLowerCase().trim(),
+        ),
       )
       if (matchedHeader) {
         const normalizedMatch = matchedHeader.toLowerCase().trim()
@@ -348,7 +356,7 @@ const importCureList = async (dbFilename, excelFile) => {
       let importedCount = 0
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i]
-        
+
         // Extract city and ZIP from the combined field
         const cityField = row[headerToDbColumn['city_raw']] || ''
         const zipCode = extractZipCode(cityField)
@@ -377,13 +385,13 @@ const importCureList = async (dbFilename, excelFile) => {
           row[headerToDbColumn['phone']] || '',
           zipCode,
           firstName,
-          lastName
-        ].map(val => val.toString().trim())
-        
+          lastName,
+        ].map((val) => val.toString().trim())
+
         if (importedCount === 0) {
           console.log('Extracted values:', values)
         }
-        
+
         insert.run(...values)
         importedCount++
       }

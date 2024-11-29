@@ -28,16 +28,19 @@ sudo dpkg --install out/make/deb/x64/cure-contributors_1.0.0_amd64.deb
 ### CLI Mode
 
 Create a new database:
+
 ```
 cure-contributors create-db database.db
 ```
 
 Reset an existing database:
+
 ```
 cure-contributors reset-db database.db
 ```
 
 Import a cure list:
+
 ```
 cure-contributors import-cure-list database.db cure-list.xls
 ```
@@ -45,6 +48,7 @@ cure-contributors import-cure-list database.db cure-list.xls
 ### GUI Mode
 
 Launch the application from your desktop environment or run:
+
 ```
 cure-contributors
 ```
@@ -71,7 +75,9 @@ npm run build
 ## Data Format
 
 ### Cure List Excel Format
+
 The tool expects cure lists in Excel format (.xls or .xlsx) with the following columns:
+
 - Voter ID
 - Party
 - Name
