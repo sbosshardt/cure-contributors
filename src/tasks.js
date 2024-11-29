@@ -2,15 +2,39 @@ const path = require('path')
 const Database = require('better-sqlite3')
 const fs = require('fs')
 const XLSX = require('xlsx-js-style')
+const csv = require('csv-parser')
 
 const purgeContributions = async (dbFilename) => {
-  console.log(
-    `In purgeContributions. Parameters passed to function: dbFilename=${dbFilename}`,
-  )
-  // Add the actual logic for purging the cure list here
+  let db = null
+  try {
+    const dbPath = path.resolve(dbFilename)
+    console.log(`Purging all contributions from database: ${dbPath}`)
+    
+    db = new Database(dbPath)
 
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+    // Begin transaction
+    db.prepare('BEGIN').run()
+
+    try {
+      // Delete all records
+      const result = db.prepare('DELETE FROM contributions').run()
+      
+      // Commit transaction
+      db.prepare('COMMIT').run()
+
+      console.log(`Successfully purged ${result.changes} contributions`)
+      return 0 // Success
+    } catch (error) {
+      // Rollback on error
+      db.prepare('ROLLBACK').run()
+      throw error
+    }
+  } catch (error) {
+    console.error('Error purging contributions:', error)
+    return 1 // Error
+  } finally {
+    if (db) db.close()
+  }
 }
 
 // Add more shared tasks as needed
@@ -105,11 +129,97 @@ const resetDb = async (dbFilename) => {
 }
 
 const importContributions = async (dbFilename, csvFilenames) => {
-  console.log(
-    `In importContributions. Parameters passed to function: csvFilenames=${csvFilenames}, dbFilename=${dbFilename}`,
-  )
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+  let db = null
+  try {
+    const dbPath = path.resolve(dbFilename)
+    const csvPaths = csvFilenames.map(f => path.resolve(f))
+    
+    console.log(`Importing contributions from ${csvPaths.length} files into ${dbPath}`)
+    db = new Database(dbPath)
+
+    let totalImported = 0
+
+    // Process each CSV file
+    for (const csvPath of csvPaths) {
+      console.log(`Processing ${csvPath}`)
+      
+      // Begin transaction for this file
+      db.prepare('BEGIN').run()
+
+      const insertSql = `
+        INSERT INTO contributions (
+          committee_id,
+          committee_name,
+          transaction_id,
+          file_number,
+          contributor_first_name,
+          contributor_last_name,
+          contributor_street_1,
+          contributor_city,
+          contributor_state,
+          contributor_zip,
+          contribution_receipt_date,
+          contribution_receipt_amount,
+          link_id,
+          memo_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      const insert = db.prepare(insertSql)
+      let fileImported = 0
+      
+      // Process the file using csv-parser
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(csvPath)
+          .pipe(csv())
+          .on('data', (row) => {
+            // Debug first row
+            if (fileImported === 0) {
+              console.log('First row data:', row)
+            }
+
+            const values = [
+              row.committee_id || '',
+              row.committee_name || '',
+              row.transaction_id || '',
+              row.file_number || '',
+              row.contributor_first_name || '',
+              row.contributor_last_name || '',
+              row.contributor_street_1 || '',
+              row.contributor_city || '',
+              row.contributor_state || '',
+              row.contributor_zip || '',
+              row.contribution_receipt_date ? 
+                row.contribution_receipt_date.split(' ')[0] : null,
+              parseFloat(row.contribution_receipt_amount) || 0.0,
+              row.link_id || '',
+              row.memo_text || ''
+            ]
+
+            // Insert the row
+            insert.run(values)
+            fileImported++
+          })
+          .on('end', () => {
+            console.log(`Imported ${fileImported} contributions from ${path.basename(csvPath)}`)
+            totalImported += fileImported
+            resolve()
+          })
+          .on('error', reject)
+      })
+
+      // Commit transaction for this file
+      db.prepare('COMMIT').run()
+    }
+
+    console.log(`Successfully imported ${totalImported} total contributions`)
+    return 0 // Success
+  } catch (error) {
+    console.error('Error importing contributions:', error)
+    if (db) db.prepare('ROLLBACK').run()
+    return 1 // Error
+  } finally {
+    if (db) db.close()
+  }
 }
 
 // Helper function to extract ZIP code from city string
