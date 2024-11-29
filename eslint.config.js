@@ -7,7 +7,7 @@ const pluginNext = require('@next/eslint-plugin-next')
 module.exports = [
   {
     // Note: there should be no other properties in this object
-    ignores: ['.next/*/*', 'out/*'],
+    ignores: ['.next/*/*', 'out/*', '.webpack/*'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx}'],
