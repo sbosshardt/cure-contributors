@@ -1,4 +1,5 @@
 const path = require('path')
+const webpack = require('webpack')
 
 module.exports = {
   entry: './src/main/index.js',
@@ -27,5 +28,12 @@ module.exports = {
   },
   externals: [
     'electron'
+  ],
+  plugins: [
+    new webpack.BannerPlugin({
+      banner: '#!/usr/bin/env node',
+      raw: true,
+      entryOnly: true
+    })
   ]
 }

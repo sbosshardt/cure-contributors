@@ -50,11 +50,23 @@ const generateReport = async (dbFilename, outputFile) => {
   return 0
 }
 
+function handleCliCommands(args) {
+  const program = new Command()
+  
+  // Set up your commands
+  program
+    .version(require('../package.json').version)
+    // ... rest of your command setup ...
+    
+  program.parse(['node', 'cure-contributors', ...args])
+}
+
 module.exports = {
-  purgeContributions,
   createDb,
   resetDb,
   importContributions,
   importCureList,
   generateReport,
+  purgeContributions,
+  handleCliCommands
 }

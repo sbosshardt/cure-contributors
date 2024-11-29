@@ -1,6 +1,8 @@
 module.exports = {
   packagerConfig: {
-    asar: true
+    asar: true,
+    extraResource: ['./dist/cure-contributors'],
+    executableName: 'cure-contributors'
   },
   rebuildConfig: {},
   makers: [
@@ -14,7 +16,18 @@ module.exports = {
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          bin: './resources/cure-contributors',
+          scripts: {
+            postinst: './scripts/postinst.sh',
+            prerm: './scripts/prerm.sh'
+          },
+          chmod: {
+            'resources/cure-contributors': '755'
+          }
+        }
+      }
     },
   ],
   plugins: [

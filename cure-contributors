@@ -1,111 +1,110 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process')
-const { readFileSync } = require('fs')
 const path = require('path')
 const { Command } = require('commander')
-const {
-  createDb,
-  resetDb,
-  importContributions,
-  importCureList,
-  generateReport,
-  purgeContributions,
-} = require('./src/tasks.js')
+const tasks = require('./src/tasks.js')
 
-const packageJsonPath = path.join(__dirname, 'package.json')
-const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+// Check if we're running in development mode
+const isDev = process.argv[1].includes('cure-contributors/cure-contributors')
 
-// Create CLI parser
-const program = new Command()
-
-// Configuration used by help command
-program
-  .version(packageJson.version, '-v, --version', 'Output the current version')
-  .description(packageJson.description)
-  .helpCommand(true)
-
-// Create DB command
-program
-  .command('create-db <dbFile>')
-  .description('Create a new database file (if needed)')
-  .action(async (dbFile) => {
-    const code = await createDb(dbFile)
-    process.exit(code)
-  })
-
-// Reset DB command
-program
-  .command('reset-db <dbFile>')
-  .description('Delete all existing tables and recreate them')
-  .action(async (dbFile) => {
-    const code = await resetDb(dbFile)
-    process.exit(code)
-  })
-
-// Import contributions command
-program
-  .command('import-contributions <dbFile> <csvFiles...>')
-  .description('Import contributions CSV files into the database')
-  .action(async (dbFile, csvFiles) => {
-    const code = await importContributions(dbFile, csvFiles)
-    process.exit(code)
-  })
-
-// Import cure list command
-program
-  .command('import-cure-list <dbFile> <excelFile>')
-  .description('Import a cure list Excel file into the database')
-  .action(async (dbFile, excelFile) => {
-    const code = await importCureList(dbFile, excelFile)
-    process.exit(code)
-  })
-
-// Generate report command
-program
-  .command('generate-report <dbFile>')
-  .description('Generate a report based on the database')
-  .option(
-    '-o, --output-file <outputFile>',
-    'Write output to a file instead of stdout',
-  )
-  .action(async (dbFile, options) => {
-    const code = await generateReport(dbFile, options.outputFile || null)
-    process.exit(code)
-  })
-
-// Purge contributions command
-program
-  .command('purge-contributions <dbFile>')
-  .description('Purge contributions data from db')
-  .action(async (dbFile) => {
-    const code = await purgeContributions(dbFile)
-    process.exit(code)
-  })
-
-// Custom parsing logic for the command line arguments
-const args = process.argv.slice(2)
-
-if (args.length === 0) {
-  // No commands provided, launch the GUI
-  const electronPath = path.join(__dirname, 'node_modules/electron/dist/electron')
-  const electronAppPath = path.join(__dirname, '.webpack/x64/main')
-
-  console.log('Launching GUI with:')
-  console.log('- Electron path:', electronPath)
-  console.log('- App path:', electronAppPath)
-
-  const child = spawn(electronPath, [electronAppPath], { 
+if (isDev && process.argv.length <= 2) {
+  // Development GUI mode: Use electron-forge start
+  const electronForge = path.join(__dirname, 'node_modules', '.bin', 'electron-forge')
+  
+  const child = spawn(electronForge, ['start'], {
     stdio: 'inherit',
     env: {
       ...process.env,
-      ELECTRON_ENABLE_LOGGING: 1
-    }
+      ELECTRON_ENABLE_LOGGING: 1,
+      FORCE_GUI: '1'
+    },
+    cwd: __dirname
   })
+
+  child.on('error', (err) => {
+    console.error('Failed to start application:', err)
+    process.exit(1)
+  })
+
   child.on('close', (code) => {
     process.exit(code)
   })
+} else if (process.versions.hasOwnProperty('electron')) {
+  // We're running in Electron, let the app continue normally
+  require('./src/main/index.js')
 } else {
-  // Run the CLI commands
+  // We're running in CLI mode
+  const { readFileSync } = require('fs')
+  const packageJsonPath = path.join(__dirname, 'package.json')
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+
+  const program = new Command()
+  
+  // Configuration used by help command
+  program
+    .version(packageJson.version, '-v, --version', 'Output the current version')
+    .description(packageJson.description)
+    .helpCommand(true)
+
+  // Create DB command
+  program
+    .command('create-db <dbFile>')
+    .description('Create a new database file (if needed)')
+    .action(async (dbFile) => {
+      const code = await tasks.createDb(dbFile)
+      process.exit(code)
+    })
+
+  // Reset DB command
+  program
+    .command('reset-db <dbFile>')
+    .description('Delete all existing tables and recreate them')
+    .action(async (dbFile) => {
+      const code = await tasks.resetDb(dbFile)
+      process.exit(code)
+    })
+
+  // Import contributions command
+  program
+    .command('import-contributions <dbFile> <csvFiles...>')
+    .description('Import contributions CSV files into the database')
+    .action(async (dbFile, csvFiles) => {
+      const code = await tasks.importContributions(dbFile, csvFiles)
+      process.exit(code)
+    })
+
+  // Import cure list command
+  program
+    .command('import-cure-list <dbFile> <excelFile>')
+    .description('Import a cure list Excel file into the database')
+    .action(async (dbFile, excelFile) => {
+      const code = await tasks.importCureList(dbFile, excelFile)
+      process.exit(code)
+    })
+
+  // Generate report command
+  program
+    .command('generate-report <dbFile>')
+    .description('Generate a report based on the database')
+    .option(
+      '-o, --output-file <outputFile>',
+      'Write output to a file instead of stdout',
+    )
+    .action(async (dbFile, options) => {
+      const code = await tasks.generateReport(dbFile, options.outputFile || null)
+      process.exit(code)
+    })
+
+  // Purge contributions command
+  program
+    .command('purge-contributions <dbFile>')
+    .description('Purge contributions data from db')
+    .action(async (dbFile) => {
+      const code = await tasks.purgeContributions(dbFile)
+      process.exit(code)
+    })
+
+  // Always parse arguments in CLI mode
   program.parse(process.argv)
 }
