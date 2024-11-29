@@ -1,5 +1,6 @@
 const path = require('path')
 const Database = require('better-sqlite3')
+const fs = require('fs')
 
 const purgeContributions = async (dbFilename) => {
   console.log(
@@ -43,12 +44,18 @@ const createDb = async (dbFilename) => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Cure list voters table
+      -- Cure list voters table matching Excel structure
       CREATE TABLE IF NOT EXISTS cure_list_voters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        voter_name TEXT NOT NULL,
-        voter_zip TEXT,
-        ballot_status TEXT,
+        voter_id TEXT,
+        party TEXT,
+        name TEXT,
+        mailed_to TEXT,
+        city TEXT,
+        phone TEXT,
+        zip_code TEXT,
+        last_name TEXT,
+        first_name TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -57,10 +64,12 @@ const createDb = async (dbFilename) => {
         ON contributions(contributor_first_name, contributor_last_name);
       CREATE INDEX IF NOT EXISTS idx_contributor_zip 
         ON contributions(contributor_zip);
+      CREATE INDEX IF NOT EXISTS idx_voter_id
+        ON cure_list_voters(voter_id);
       CREATE INDEX IF NOT EXISTS idx_voter_name 
-        ON cure_list_voters(voter_name);
+        ON cure_list_voters(last_name, first_name);
       CREATE INDEX IF NOT EXISTS idx_voter_zip 
-        ON cure_list_voters(voter_zip);
+        ON cure_list_voters(zip_code);
     `)
 
     // Close the database connection
@@ -75,11 +84,23 @@ const createDb = async (dbFilename) => {
 }
 
 const resetDb = async (dbFilename) => {
-  console.log(
-    `In resetDb. Parameters passed to function: dbFilename=${dbFilename}`,
-  )
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+  try {
+    // Ensure we have an absolute path
+    const dbPath = path.resolve(dbFilename)
+    
+    // Delete the file if it exists
+    if (fs.existsSync(dbPath)) {
+      console.log(`Deleting existing database at: ${dbPath}`)
+      fs.unlinkSync(dbPath)
+    }
+
+    // Create new database
+    console.log('Creating new database...')
+    return await createDb(dbPath)
+  } catch (error) {
+    console.error('Error resetting database:', error)
+    return 1 // Error
+  }
 }
 
 const importContributions = async (dbFilename, csvFilenames) => {
