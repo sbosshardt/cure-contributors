@@ -126,6 +126,22 @@ const cleanCity = (cityStr) => {
     .trim()
 }
 
+// Helper function to parse name
+const parseName = (fullName) => {
+  // First, handle suffixes by removing them
+  const withoutSuffix = fullName.replace(/ (JR|SR|II|III|IV|V),/, ',')
+  
+  // Extract last name (first part before comma)
+  const lastNameMatch = withoutSuffix.match(/^(?:[^ ,]+ )?([^ ,]+),/)
+  const lastName = lastNameMatch ? lastNameMatch[1] : ''
+  
+  // Extract first name (first word after comma)
+  const firstNameMatch = withoutSuffix.match(/^(?:[^ ,]+ ){0,3}[^ ,]+[, ]+([^, ]+)/)
+  const firstName = firstNameMatch ? firstNameMatch[1] : ''
+  
+  return { firstName, lastName }
+}
+
 const importCureList = async (dbFilename, excelFile) => {
   try {
     // Ensure we have absolute paths
@@ -148,7 +164,7 @@ const importCureList = async (dbFilename, excelFile) => {
       'name': ['name'].map(h => h.toLowerCase()),
       'mailed_to': ['mailed to'].map(h => h.toLowerCase()),
       'city_raw': ['city', '     city'].map(h => h.toLowerCase()),
-      'phone': ['phone '].map(h => h.toLowerCase()),
+      'phone': ['phone ', 'phone'].map(h => h.toLowerCase()),
     }
     
     // First, get the raw data with original headers
@@ -203,8 +219,10 @@ const importCureList = async (dbFilename, excelFile) => {
           mailed_to,
           city,
           phone,
-          zip_code
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          zip_code,
+          first_name,
+          last_name
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       console.log('SQL:', insertSql)
 
@@ -220,12 +238,18 @@ const importCureList = async (dbFilename, excelFile) => {
         const zipCode = extractZipCode(cityField)
         const city = cleanCity(cityField)
 
+        // Parse name into first and last
+        const fullName = row[headerToDbColumn['name']] || ''
+        const { firstName, lastName } = parseName(fullName)
+
         // Debug: show the first data row
         if (importedCount === 0) {
           console.log('First row data:', row)
           console.log('Raw city field:', cityField)
           console.log('Extracted city:', city)
           console.log('Extracted ZIP:', zipCode)
+          console.log('Full name:', fullName)
+          console.log('Parsed name:', { firstName, lastName })
         }
 
         const values = [
@@ -235,7 +259,9 @@ const importCureList = async (dbFilename, excelFile) => {
           row[headerToDbColumn['mailed_to']] || '',
           city,
           row[headerToDbColumn['phone']] || '',
-          zipCode
+          zipCode,
+          firstName,
+          lastName
         ].map(val => val.toString().trim())
         
         if (importedCount === 0) {
