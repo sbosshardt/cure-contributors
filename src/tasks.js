@@ -213,7 +213,17 @@ const importContributions = async (dbFilename, csvFilenames) => {
         const rows = await new Promise((resolve, reject) => {
           const results = []
           fs.createReadStream(csvPath)
-            .pipe(csv())
+            .pipe(csv({
+              mapHeaders: ({ header, index }) => {
+                // If this is a duplicate header, append the index to make it unique
+                if (header === 'committee_name') {
+                  return index === 1
+                    ? 'committee_name'
+                    : 'committee_name_duplicate'
+                }
+                return header
+              },
+            }))
             .on('data', (data) => results.push(data))
             .on('end', () => resolve(results))
             .on('error', reject)
@@ -388,11 +398,13 @@ const importCureList = async (dbFilename, xlsxFile) => {
 
           // Extract zip code from address
           let zipCode = ''
-          const cityStateZip = row.City || ''
+          const cityStateZip = row.City || row['     City'] || ''
+          // First try to find a 5-digit sequence
           const zipMatch = cityStateZip.match(/\b\d{5}\b/)
           if (zipMatch) {
             zipCode = zipMatch[0]
           } else {
+            // If no 5-digit sequence, try to find any sequence of 4-5 digits at the end
             const looseMatch = cityStateZip.match(/\b\d{4,5}$/)
             zipCode = looseMatch ? looseMatch[0].padStart(5, '0') : ''
           }
