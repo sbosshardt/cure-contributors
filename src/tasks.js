@@ -528,6 +528,39 @@ const formatZipCode = (zip) => {
   return String(zip).replace(/\D/g, '').slice(0, 5).padStart(5, '0')
 }
 
+const purgeCureList = async (dbFilename) => {
+  let db = null
+  try {
+    const dbPath = path.resolve(dbFilename)
+    console.log(`Purging all cure list voters from database: ${dbPath}`)
+
+    db = new Database(dbPath)
+
+    // Begin transaction
+    db.prepare('BEGIN').run()
+
+    try {
+      // Delete all records
+      const result = db.prepare('DELETE FROM cure_list_voters').run()
+
+      // Commit transaction
+      db.prepare('COMMIT').run()
+
+      console.log(`Successfully purged ${result.changes} cure list voters`)
+      return 0 // Success
+    } catch (error) {
+      // Rollback on error
+      db.prepare('ROLLBACK').run()
+      throw error
+    }
+  } catch (error) {
+    console.error('Error purging cure list:', error)
+    return 1 // Error
+  } finally {
+    if (db) db.close()
+  }
+}
+
 module.exports = {
   createDb,
   resetDb,
@@ -535,5 +568,6 @@ module.exports = {
   importCureList,
   generateReport,
   purgeContributions,
+  purgeCureList,
   handleCliCommands,
 }

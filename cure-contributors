@@ -108,6 +108,15 @@ if (isDev && process.argv.length <= 2) {
       process.exit(code)
     })
 
+  // Purge cure list command
+  program
+    .command('purge-cure-list <dbFile>')
+    .description('Purge all cure list voters from the database')
+    .action(async (dbFile) => {
+      const exitCode = await tasks.purgeCureList(dbFile)
+      process.exit(exitCode)
+    })
+
   // Always parse arguments in CLI mode
   program.parse(process.argv)
 }
