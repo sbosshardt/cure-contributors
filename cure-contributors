@@ -90,18 +90,13 @@ if (isDev && process.argv.length <= 2) {
 
   // Generate report command
   program
-    .command('generate-report <dbFile>')
-    .description('Generate a report based on the database')
-    .option(
-      '-o, --output-file <outputFile>',
-      'Write output to a file instead of stdout',
+    .command('generate-report <dbFile> [outputFile]')
+    .description(
+      'Generate a report of matches between cure list voters and FEC contributions',
     )
-    .action(async (dbFile, options) => {
-      const code = await tasks.generateReport(
-        dbFile,
-        options.outputFile || null,
-      )
-      process.exit(code)
+    .action(async (dbFile, outputFile) => {
+      const exitCode = await tasks.generateReport(dbFile, outputFile)
+      process.exit(exitCode)
     })
 
   // Purge contributions command

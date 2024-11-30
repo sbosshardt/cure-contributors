@@ -62,6 +62,8 @@ const createDb = async (dbFilename) => {
         contributor_city TEXT,
         contributor_state TEXT,
         contributor_zip TEXT,
+        contributor_employer TEXT,
+        contributor_occupation TEXT,
         contribution_receipt_date DATE,
         contribution_receipt_amount DECIMAL(10,2),
         link_id TEXT,
@@ -160,11 +162,13 @@ const importContributions = async (dbFilename, csvFilenames) => {
           contributor_city,
           contributor_state,
           contributor_zip,
+          contributor_employer,
+          contributor_occupation,
           contribution_receipt_date,
           contribution_receipt_amount,
           link_id,
           memo_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       const insert = db.prepare(insertSql)
       let fileImported = 0
@@ -172,7 +176,19 @@ const importContributions = async (dbFilename, csvFilenames) => {
       // Process the file using csv-parser
       await new Promise((resolve, reject) => {
         fs.createReadStream(csvPath)
-          .pipe(csv())
+          .pipe(
+            csv({
+              mapHeaders: ({ header, index }) => {
+                // If this is a duplicate header, append the index to make it unique
+                if (header === 'committee_name') {
+                  return index === 1
+                    ? 'committee_name'
+                    : 'committee_name_duplicate'
+                }
+                return header
+              },
+            }),
+          )
           .on('data', (row) => {
             // Debug first row
             if (fileImported === 0) {
@@ -190,6 +206,8 @@ const importContributions = async (dbFilename, csvFilenames) => {
               row.contributor_city || '',
               row.contributor_state || '',
               row.contributor_zip || '',
+              row.contributor_employer || '',
+              row.contributor_occupation || '',
               row.contribution_receipt_date
                 ? row.contribution_receipt_date.split(' ')[0]
                 : null,
@@ -416,11 +434,110 @@ const importCureList = async (dbFilename, excelFile) => {
 }
 
 const generateReport = async (dbFilename, outputFile) => {
-  console.log(
-    `In generateReport. Parameters passed to function: dbFilename=${dbFilename}, outputFile=${outputFile}`,
-  )
-  // Indicate that the task/program should exit with a success status code.
-  return 0
+  const { displayReportCli, generateHtmlReport } = require('./reporting')
+  let db = null
+  try {
+    const dbPath = path.resolve(dbFilename)
+    console.log(`Generating report from database: ${dbPath}`)
+
+    db = new Database(dbPath)
+
+    // Query to find matches between cure list voters and contributions
+    const matches = db
+      .prepare(
+        `
+      SELECT DISTINCT
+        v.voter_id,
+        v.party,
+        v.name as voter_name,
+        v.mailed_to,
+        v.city as voter_city,
+        v.phone,
+        v.zip_code,
+        v.last_name as voter_last_name,
+        v.first_name as voter_first_name,
+        c.committee_id,
+        c.committee_name,
+        c.transaction_id,
+        c.file_number,
+        c.contributor_first_name,
+        c.contributor_last_name,
+        c.contributor_street_1,
+        c.contributor_city,
+        c.contributor_state,
+        c.contributor_zip,
+        c.contributor_employer,
+        c.contributor_occupation,
+        c.contribution_receipt_date,
+        c.contribution_receipt_amount,
+        c.link_id,
+        c.memo_text
+      FROM cure_list_voters v
+      JOIN contributions c 
+        ON v.last_name = c.contributor_last_name 
+        AND v.first_name = c.contributor_first_name
+      ORDER BY v.last_name, v.first_name, c.contribution_receipt_date DESC
+    `,
+      )
+      .all()
+
+    // Group contributions by voter
+    const groupedMatches = matches.reduce((acc, row) => {
+      // Create a unique key for each voter
+      const voterKey = `${row.voter_last_name}_${row.voter_first_name}_${row.voter_id}`
+
+      if (!acc[voterKey]) {
+        // First time seeing this voter
+        acc[voterKey] = {
+          voter: {
+            last_name: row.voter_last_name,
+            first_name: row.voter_first_name,
+            zip_code: row.zip_code,
+            party: row.party,
+            name: row.voter_name,
+            mailed_to: row.mailed_to,
+            voter_id: row.voter_id,
+          },
+          contributions: [],
+        }
+      }
+
+      // Add this contribution to the voter's list
+      acc[voterKey].contributions.push({
+        contributor_last_name: row.contributor_last_name,
+        contributor_first_name: row.contributor_first_name,
+        contributor_street_1: row.contributor_street_1,
+        committee_name: row.committee_name,
+        contribution_receipt_date: row.contribution_receipt_date,
+        contributor_employer: row.contributor_employer,
+        contributor_occupation: row.contributor_occupation,
+        transaction_id: row.transaction_id,
+        contribution_receipt_amount: row.contribution_receipt_amount,
+      })
+
+      return acc
+    }, {})
+
+    // Convert the grouped object back to an array
+    const transformedMatches = Object.values(groupedMatches)
+
+    // Always show CLI output
+    displayReportCli(transformedMatches)
+
+    // If output file specified, generate HTML
+    if (outputFile) {
+      const html = generateHtmlReport(transformedMatches)
+      fs.writeFileSync(outputFile, html)
+      console.log(`Report saved to: ${outputFile}`)
+    }
+
+    return 0 // Success
+  } catch (error) {
+    console.error('Error generating report:', error)
+    return 1 // Error
+  } finally {
+    if (db) db.close()
+  }
 }
 
 function handleCliCommands(args) {
