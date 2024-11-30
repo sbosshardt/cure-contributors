@@ -3,6 +3,11 @@ const Database = require('better-sqlite3')
 const fs = require('fs')
 const XLSX = require('xlsx-js-style')
 const csv = require('csv-parser')
+const {
+  generateReport,
+  normalizeAddress,
+  normalizeName,
+} = require('./reporting.js')
 
 const purgeContributions = async (dbFilename) => {
   let db = null
@@ -68,6 +73,10 @@ const createDb = async (dbFilename) => {
         contribution_receipt_amount DECIMAL(10,2),
         link_id TEXT,
         memo_text TEXT,
+        -- Add normalized columns
+        norm_addr TEXT,
+        norm_first TEXT,
+        norm_last TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -83,6 +92,10 @@ const createDb = async (dbFilename) => {
         zip_code TEXT,
         last_name TEXT,
         first_name TEXT,
+        -- Add normalized columns
+        norm_addr TEXT,
+        norm_first TEXT,
+        norm_last TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -105,11 +118,15 @@ const createDb = async (dbFilename) => {
         ON cure_list_voters(last_name, first_name, zip_code);
       CREATE INDEX IF NOT EXISTS idx_voter_mailed_to 
         ON cure_list_voters(mailed_to);
+      
+      -- Add indexes for normalized columns
+      CREATE INDEX IF NOT EXISTS idx_contrib_norm 
+        ON contributions(norm_addr, norm_first, norm_last);
+      CREATE INDEX IF NOT EXISTS idx_voter_norm 
+        ON cure_list_voters(norm_addr, norm_first, norm_last);
     `)
 
-    // Close the database connection
     db.close()
-
     console.log('Database created/verified successfully')
     return 0 // Success
   } catch (error) {
@@ -149,104 +166,101 @@ const importContributions = async (dbFilename, csvFilenames) => {
     )
     db = new Database(dbPath)
 
+    // Create normalization functions in SQLite
+    db.function('normalize_address', (addr) => normalizeAddress(addr))
+    db.function('normalize_name', (name) => normalizeName(name))
+
     let totalImported = 0
 
     // Process each CSV file
     for (const csvPath of csvPaths) {
-      console.log(`Processing ${csvPath}`)
+      console.log(`Processing ${csvPath}...`)
 
       // Begin transaction for this file
       db.prepare('BEGIN').run()
 
-      const insertSql = `
-        INSERT INTO contributions (
-          committee_id,
-          committee_name,
-          transaction_id,
-          file_number,
-          contributor_first_name,
-          contributor_last_name,
-          contributor_street_1,
-          contributor_city,
-          contributor_state,
-          contributor_zip,
-          contributor_employer,
-          contributor_occupation,
-          contribution_receipt_date,
-          contribution_receipt_amount,
-          link_id,
-          memo_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      const insert = db.prepare(insertSql)
-      let fileImported = 0
-
-      // Process the file using csv-parser
-      await new Promise((resolve, reject) => {
-        fs.createReadStream(csvPath)
-          .pipe(
-            csv({
-              mapHeaders: ({ header, index }) => {
-                // If this is a duplicate header, append the index to make it unique
-                if (header === 'committee_name') {
-                  return index === 1
-                    ? 'committee_name'
-                    : 'committee_name_duplicate'
-                }
-                return header
-              },
-            }),
+      try {
+        const insert = db.prepare(`
+          INSERT INTO contributions (
+            committee_id,
+            committee_name,
+            transaction_id,
+            file_number,
+            contributor_first_name,
+            contributor_last_name,
+            contributor_street_1,
+            contributor_city,
+            contributor_state,
+            contributor_zip,
+            contributor_employer,
+            contributor_occupation,
+            contribution_receipt_date,
+            contribution_receipt_amount,
+            link_id,
+            memo_text,
+            norm_addr,
+            norm_first,
+            norm_last
+          ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            normalize_address(?),  -- normalize address during insert
+            normalize_name(?),     -- normalize first name during insert
+            normalize_name(?)      -- normalize last name during insert
           )
-          .on('data', (row) => {
-            // Debug first row
-            if (fileImported === 0) {
-              console.log('First row data:', row)
-            }
+        `)
 
-            const values = [
-              row.committee_id || '',
-              row.committee_name || '',
-              row.transaction_id || '',
-              row.file_number || '',
-              row.contributor_first_name || '',
-              row.contributor_last_name || '',
-              row.contributor_street_1 || '',
-              row.contributor_city || '',
-              row.contributor_state || '',
-              formatZipCode(row.contributor_zip),
-              row.contributor_employer || '',
-              row.contributor_occupation || '',
-              row.contribution_receipt_date
-                ? row.contribution_receipt_date.split(' ')[0]
-                : null,
-              parseFloat(row.contribution_receipt_amount) || 0.0,
-              row.link_id || '',
-              row.memo_text || '',
-            ]
+        // ... rest of CSV processing ...
+        const rows = await new Promise((resolve, reject) => {
+          const results = []
+          fs.createReadStream(csvPath)
+            .pipe(csv())
+            .on('data', (data) => results.push(data))
+            .on('end', () => resolve(results))
+            .on('error', reject)
+        })
 
-            // Insert the row
-            insert.run(values)
-            fileImported++
-          })
-          .on('end', () => {
-            console.log(
-              `Imported ${fileImported} contributions from ${path.basename(csvPath)}`,
-            )
-            totalImported += fileImported
-            resolve()
-          })
-          .on('error', reject)
-      })
+        let imported = 0
+        for (const row of rows) {
+          const values = [
+            row.committee_id || '',
+            row.committee_name || '',
+            row.transaction_id || '',
+            row.file_number || '',
+            row.contributor_first_name || '',
+            row.contributor_last_name || '',
+            row.contributor_street_1 || '',
+            row.contributor_city || '',
+            row.contributor_state || '',
+            formatZipCode(row.contributor_zip),
+            row.contributor_employer || '',
+            row.contributor_occupation || '',
+            row.contribution_receipt_date || '',
+            parseFloat(row.contribution_receipt_amount || 0),
+            row.link_id || '',
+            row.memo_text || '',
+            row.contributor_street_1 || '', // address to normalize
+            row.contributor_first_name || '', // first name to normalize
+            row.contributor_last_name || '', // last name to normalize
+          ]
+          insert.run(values)
+          imported++
+        }
 
-      // Commit transaction for this file
-      db.prepare('COMMIT').run()
+        db.prepare('COMMIT').run()
+        totalImported += imported
+        console.log(
+          `Imported ${imported} contributions from ${path.basename(csvPath)}`,
+        )
+      } catch (error) {
+        db.prepare('ROLLBACK').run()
+        throw error
+      }
     }
 
     console.log(`Successfully imported ${totalImported} total contributions`)
     return 0 // Success
   } catch (error) {
     console.error('Error importing contributions:', error)
-    if (db) db.prepare('ROLLBACK').run()
     return 1 // Error
   } finally {
     if (db) db.close()
@@ -301,21 +315,27 @@ const importCureList = async (dbFilename, xlsxFile) => {
       throw new Error('No data found in Excel file')
     }
 
-    // Detect format based on headers (case-insensitive)
+    // Detect format and voter ID field
     const firstRow = data[0]
     const headers = Object.keys(firstRow).map((h) => h.toLowerCase())
     const isNewFormat =
       headers.includes('firstname') && headers.includes('lastname')
-
-    // Find voter ID field if it exists (look for 'regid' in any header)
     const voterIdField = Object.keys(firstRow).find((header) =>
       header.toLowerCase().includes('regid'),
     )
+
     console.log(
-      `Detected format: ${isNewFormat ? 'new' : 'original'}${voterIdField ? `, using ${voterIdField} for voter ID` : ''}`,
+      `Detected format: ${isNewFormat ? 'new' : 'original'}${
+        voterIdField ? `, using ${voterIdField} for voter ID` : ''
+      }`,
     )
 
     db = new Database(dbPath)
+
+    // Create normalization functions in SQLite
+    db.function('normalize_address', (addr) => normalizeAddress(addr))
+    db.function('normalize_name', (name) => normalizeName(name))
+
     db.prepare('BEGIN').run()
 
     try {
@@ -329,44 +349,50 @@ const importCureList = async (dbFilename, xlsxFile) => {
           phone,
           zip_code,
           last_name,
-          first_name
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          first_name,
+          norm_addr,
+          norm_first,
+          norm_last
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+          normalize_address(?),  -- normalize address during insert
+          normalize_name(?),     -- normalize first name during insert
+          normalize_name(?)      -- normalize last name during insert
+        )
       `)
 
       let imported = 0
       for (const row of data) {
         if (isNewFormat) {
-          // New format with separate name fields
+          const lastName = row.lastname || row.LastName || ''
+          const firstName = row.firstname || row.FirstName || ''
+          const address = row.registrationaddr1 || row.RegistrationAddr1 || ''
+
           const values = [
-            voterIdField ? row[voterIdField] || '' : null, // Use found voter ID field if it exists
-            null, // party (not available)
-            `${row.lastname || row.LastName}, ${row.firstname || row.FirstName}`,
-            row.registrationaddr1 || row.RegistrationAddr1 || '',
-            null, // city (not available)
-            null, // phone (not available)
+            voterIdField ? row[voterIdField] || '' : null,
+            null, // party
+            `${lastName}, ${firstName}`,
+            address,
+            null, // city
+            null, // phone
             formatZipCode(row.regzip5 || row.RegZip5),
-            row.lastname || row.LastName || '',
-            row.firstname || row.FirstName || '',
+            lastName,
+            firstName,
+            address, // address to normalize
+            firstName, // first name to normalize
+            lastName, // last name to normalize
           ]
           insert.run(values)
         } else {
-          // Original format with name parsing
-          // const nameParts = (row.Name || '').split(',').map(part => part.trim())
-          // const lastName = nameParts[0] || ''
-          // const firstName = nameParts[1] || ''
           const { lastName, firstName } = parseName(row.Name)
+          const address = row['Mailed To'] || ''
 
-          // Extract zip code from address - try multiple patterns
+          // Extract zip code from address
           let zipCode = ''
-          //const mailedTo = row['Mailed To'] || ''
           const cityStateZip = row.City || ''
-
-          // First try to find a 5-digit sequence
           const zipMatch = cityStateZip.match(/\b\d{5}\b/)
           if (zipMatch) {
             zipCode = zipMatch[0]
           } else {
-            // If no 5-digit sequence, try to find any sequence of 4-5 digits at the end
             const looseMatch = cityStateZip.match(/\b\d{4,5}$/)
             zipCode = looseMatch ? looseMatch[0].padStart(5, '0') : ''
           }
@@ -375,12 +401,15 @@ const importCureList = async (dbFilename, xlsxFile) => {
             row['Voter ID'] || '',
             row.Party || '',
             row.Name || '',
-            row['Mailed To'] || '',
+            address,
             row.City || '',
             row.Phone || '',
             formatZipCode(zipCode),
             lastName,
             firstName,
+            address, // address to normalize
+            firstName, // first name to normalize
+            lastName, // last name to normalize
           ]
           insert.run(values)
         }
@@ -400,11 +429,6 @@ const importCureList = async (dbFilename, xlsxFile) => {
   } finally {
     if (db) db.close()
   }
-}
-
-const generateReport = async (dbFilename, outputFile, debug = false) => {
-  const { generateReport: gr } = require('./reporting.js')
-  return gr(dbFilename, outputFile, debug)
 }
 
 // Add this helper function

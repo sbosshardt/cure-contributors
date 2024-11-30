@@ -351,7 +351,7 @@ function validateNameInput(name) {
 }
 
 // Update the helper functions to use validation
-function normalizeAddress(addr, debug = false) {
+const normalizeAddress = (addr, debug = false) => {
   addr = validateAddressInput(addr)
   if (!addr) return ''
 
@@ -401,7 +401,7 @@ function normalizeAddress(addr, debug = false) {
   return normalized
 }
 
-function normalizeName(name, debug = false) {
+const normalizeName = (name, debug = false) => {
   name = validateNameInput(name)
   if (!name) return ''
 
@@ -537,76 +537,113 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
       console.log('Name mapping validation passed\n')
     }
 
-    const { displayReportCli, generateHtmlReport } = require('./reporting')
     let db = null
     try {
+      const path = require('path')
+      const Database = require('better-sqlite3')
       const dbPath = path.resolve(dbFilename)
       console.log(`Generating report from database: ${dbPath}`)
 
       db = new Database(dbPath)
 
-      // Create SQL functions with debug parameter
-      db.function('normalize_address', (addr) => normalizeAddress(addr, debug))
-      db.function('normalize_name', (name) => normalizeName(name, debug))
+      // Log table sizes for context
+      const voterCount = db
+        .prepare('SELECT COUNT(*) as count FROM cure_list_voters')
+        .get().count
+      const contribCount = db
+        .prepare('SELECT COUNT(*) as count FROM contributions')
+        .get().count
+      console.log(
+        `Database contains ${voterCount.toLocaleString()} voters and ${contribCount.toLocaleString()} contributions`,
+      )
 
       if (debug) {
-        console.log('\nRunning normalization tests before generating report...')
+        console.log('\nRunning normalization tests...')
         runNormalizationTests()
         console.log('\nProceeding with report generation...\n')
       }
 
-      // Updated query with fuzzy matching
+      // Perform the match query using normalized columns
+      console.log('\nStep 1/2: Finding matches...')
+      const matchStart = Date.now()
+
+      // Get an estimate of total matches first
+      const estimatedTotal = db
+        .prepare(
+          `
+    SELECT COUNT(*) as count 
+    FROM cure_list_voters v 
+    JOIN contributions c ON (
+      (v.norm_addr = c.norm_addr AND 
+       (v.norm_first = c.norm_first OR 
+        v.norm_last = c.norm_last))
+      OR
+      (v.norm_first = c.norm_first AND 
+       v.norm_last = c.norm_last)
+    )
+    `,
+        )
+        .get().count
+
+      console.log(
+        `Estimated matches to process: ${estimatedTotal.toLocaleString()}`,
+      )
+
+      // Now run the main query
       const matches = db
         .prepare(
           `
-          SELECT DISTINCT
-            v.voter_id,
-            v.party,
-            v.name as voter_name,
-            v.mailed_to,
-            v.city as voter_city,
-            v.phone,
-            v.zip_code,
-            v.last_name as voter_last_name,
-            v.first_name as voter_first_name,
-            c.committee_id,
-            c.committee_name,
-            c.transaction_id,
-            c.file_number,
-            c.contributor_first_name,
-            c.contributor_last_name,
-            c.contributor_street_1,
-            c.contributor_city,
-            c.contributor_state,
-            c.contributor_zip,
-            c.contributor_employer,
-            c.contributor_occupation,
-            c.contribution_receipt_date,
-            c.contribution_receipt_amount,
-            c.link_id,
-            c.memo_text,
-            -- Add match indicators
-            (normalize_address(c.contributor_street_1) = normalize_address(v.mailed_to)) as address_matched,
-            (c.contributor_zip = v.zip_code) as zip_matched,
-            (normalize_name(c.contributor_first_name) = normalize_name(v.first_name)) as first_name_matched,
-            (normalize_name(c.contributor_last_name) = normalize_name(v.last_name)) as last_name_matched
-          FROM cure_list_voters v
-          JOIN contributions c ON (
-            -- Match Type #1: Normalized Address + (First OR Last name)
-            (normalize_address(c.contributor_street_1) = normalize_address(v.mailed_to) AND 
-             (normalize_name(c.contributor_first_name) = normalize_name(v.first_name) OR 
-              normalize_name(c.contributor_last_name) = normalize_name(v.last_name)))
-            OR
-            -- Match Type #2: Normalized First + Last names
-            (normalize_name(c.contributor_first_name) = normalize_name(v.first_name) AND 
-             normalize_name(c.contributor_last_name) = normalize_name(v.last_name))
-          )
-          ORDER BY v.last_name, v.first_name, c.contribution_receipt_date DESC
-        `,
+    SELECT DISTINCT
+      v.voter_id,
+      v.party,
+      v.name as voter_name,
+      v.mailed_to,
+      v.city as voter_city,
+      v.phone,
+      v.zip_code,
+      v.last_name as voter_last_name,
+      v.first_name as voter_first_name,
+      c.committee_id,
+      c.committee_name,
+      c.transaction_id,
+      c.file_number,
+      c.contributor_first_name,
+      c.contributor_last_name,
+      c.contributor_street_1,
+      c.contributor_city,
+      c.contributor_state,
+      c.contributor_zip,
+      c.contributor_employer,
+      c.contributor_occupation,
+      c.contribution_receipt_date,
+      c.contribution_receipt_amount,
+      c.link_id,
+      c.memo_text,
+      (v.norm_addr = c.norm_addr) as address_matched,
+      (v.zip_code = c.contributor_zip) as zip_matched,
+      (v.norm_first = c.norm_first) as first_name_matched,
+      (v.norm_last = c.norm_last) as last_name_matched
+    FROM cure_list_voters v
+    JOIN contributions c ON (
+      (v.norm_addr = c.norm_addr AND 
+       (v.norm_first = c.norm_first OR 
+        v.norm_last = c.norm_last))
+      OR
+      (v.norm_first = c.norm_first AND 
+       v.norm_last = c.norm_last)
+    )
+    ORDER BY v.last_name, v.first_name, c.contribution_receipt_date DESC
+    `,
         )
         .all()
 
-      // Group contributions by voter
+      console.log(
+        `\nFound ${matches.length.toLocaleString()} matches in ${((Date.now() - matchStart) / 1000).toFixed(1)} seconds`,
+      )
+
+      // Process matches and generate report
+      console.log('\nStep 2/2: Generating report...')
+      const reportStart = Date.now()
       const groupedMatches = matches.reduce((acc, row) => {
         const voterKey = `${row.voter_last_name}_${row.voter_first_name}_${row.voter_id}`
 
@@ -648,8 +685,22 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
         return acc
       }, {})
 
-      // Convert the grouped object back to an array
       const transformedMatches = Object.values(groupedMatches)
+      console.log(
+        `Report processing completed in ${((Date.now() - reportStart) / 1000).toFixed(1)} seconds`,
+      )
+
+      // Show summary
+      console.log(
+        `\nFound ${transformedMatches.length.toLocaleString()} unique voters with matches`,
+      )
+      const totalContributions = transformedMatches.reduce(
+        (sum, m) => sum + m.contributions.length,
+        0,
+      )
+      console.log(
+        `Total matched contributions: ${totalContributions.toLocaleString()}`,
+      )
 
       // Always show CLI output
       displayReportCli(transformedMatches)
@@ -657,9 +708,13 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
       // If output file specified, generate HTML
       if (outputFile) {
         const html = generateHtmlReport(transformedMatches)
+        const fs = require('fs')
         fs.writeFileSync(outputFile, html)
-        console.log(`Report saved to: ${outputFile}`)
+        console.log(`\nReport saved to: ${outputFile}`)
       }
+
+      const totalTime = (Date.now() - matchStart) / 1000
+      console.log(`\nTotal processing time: ${totalTime.toFixed(1)} seconds`)
 
       return 0 // Success
     } catch (error) {
@@ -678,4 +733,6 @@ module.exports = {
   displayReportCli,
   generateHtmlReport,
   generateReport,
+  normalizeAddress,
+  normalizeName,
 }
