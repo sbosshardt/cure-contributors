@@ -1,15 +1,9 @@
-#!/usr/bin/env node
-
 const { Command } = require('commander')
 const tasks = require('./tasks.js')
 const path = require('path')
 const { spawn } = require('child_process')
 
-// If no arguments provided, launch GUI
-if (process.argv.length <= 2) {
-  // Check if we're running the development version
-  const isDev = process.argv[1].startsWith('.')
-
+function launchGui(isDev) {
   if (isDev) {
     // Development: Use electron-forge start
     const projectRoot = path.resolve(__dirname, '..')
@@ -30,14 +24,7 @@ if (process.argv.length <= 2) {
       cwd: projectRoot,
     })
 
-    child.on('error', (err) => {
-      console.error('Failed to start application:', err)
-      process.exit(1)
-    })
-
-    child.on('close', (code) => {
-      process.exit(code)
-    })
+    handleChildProcess(child)
   } else {
     // Production: Launch the installed electron app
     const electronExecutable = '/usr/lib/cure-contributors/cure-contributors'
@@ -51,18 +38,22 @@ if (process.argv.length <= 2) {
       },
     })
 
-    child.on('error', (err) => {
-      console.error('Failed to start application:', err)
-      process.exit(1)
-    })
-
-    child.on('close', (code) => {
-      process.exit(code)
-    })
+    handleChildProcess(child)
   }
-} else {
-  const program = new Command()
+}
 
+function handleChildProcess(child) {
+  child.on('error', (err) => {
+    console.error('Failed to start application:', err)
+    process.exit(1)
+  })
+
+  child.on('close', (code) => {
+    process.exit(code)
+  })
+}
+
+function setupCliCommands(program) {
   program
     .name('cure-contributors')
     .version(require('../package.json').version)
@@ -133,5 +124,32 @@ if (process.argv.length <= 2) {
       process.exit(code)
     })
 
-  program.parse()
+  // Add purge-cure-list command
+  program
+    .command('purge-cure-list')
+    .argument('<dbFile>', 'Database file to purge cure list from')
+    .description('Purge cure list voters from db')
+    .action(async (dbFile) => {
+      const code = await tasks.purgeCureList(dbFile)
+      process.exit(code)
+    })
+}
+
+function handleCliCommands(args) {
+  // If no arguments provided, launch GUI
+  if (args.length <= 2) {
+    // Check if we're running the development version
+    const isDev = args[1].startsWith('.')
+    launchGui(isDev)
+    return
+  }
+
+  // Handle CLI commands
+  const program = new Command()
+  setupCliCommands(program)
+  program.parse(args)
+}
+
+module.exports = {
+  handleCliCommands,
 }
