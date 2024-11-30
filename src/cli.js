@@ -107,10 +107,12 @@ function setupCliCommands(program) {
       '-o, --output-file <outputFile>',
       'Write output to a file instead of stdout',
     )
+    .option('-d, --debug', 'Enable debug logging for normalization steps')
     .action(async (dbFile, options) => {
       const code = await tasks.generateReport(
         dbFile,
         options.outputFile || null,
+        options.debug || false
       )
       process.exit(code)
     })
