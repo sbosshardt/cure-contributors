@@ -205,7 +205,7 @@ const importContributions = async (dbFilename, csvFilenames) => {
               row.contributor_street_1 || '',
               row.contributor_city || '',
               row.contributor_state || '',
-              row.contributor_zip || '',
+              formatZipCode(row.contributor_zip),
               row.contributor_employer || '',
               row.contributor_occupation || '',
               row.contribution_receipt_date
@@ -277,83 +277,33 @@ const parseName = (fullName) => {
   return { firstName, lastName }
 }
 
-const importCureList = async (dbFilename, excelFile) => {
+const importCureList = async (dbFilename, xlsxFile) => {
+  let db = null
   try {
-    // Ensure we have absolute paths
     const dbPath = path.resolve(dbFilename)
-    const excelPath = path.resolve(excelFile)
-
-    console.log(`Importing cure list from ${excelPath} into ${dbPath}`)
+    console.log(`Importing cure list from ${xlsxFile} into ${dbPath}`)
 
     // Read the Excel file
-    const workbook = XLSX.readFile(excelPath)
-
-    // Get the first sheet
+    const workbook = XLSX.readFile(xlsxFile)
     const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
+    const worksheet = workbook.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json(worksheet)
 
-    // Define column mapping (Excel header -> DB column)
-    const columnMapping = {
-      voter_id: ['av_id', 'voter_id'],
-      party: ['party'],
-      name: ['name'],
-      mailed_to: ['mailed to'],
-      city_raw: ['city'],
-      phone: ['phone'],
+    if (data.length === 0) {
+      throw new Error('No data found in Excel file')
     }
 
-    // First, get the raw data with original headers
-    const rows = XLSX.utils.sheet_to_json(sheet, {
-      raw: false,
-      defval: '',
-      header: 'A',
-    })
+    // Detect format based on headers (case-insensitive)
+    const firstRow = data[0]
+    const headers = Object.keys(firstRow).map(h => h.toLowerCase())
+    const isNewFormat = headers.includes('firstname') && headers.includes('lastname')
+    console.log(`Detected format: ${isNewFormat ? 'new' : 'original'}`)
 
-    if (rows.length === 0) {
-      console.error('No data found in Excel file')
-      return 1
-    }
-
-    // Get headers from first row and normalize them
-    const headerRow = rows[0]
-    const normalizedHeaders = {}
-    Object.entries(headerRow).forEach(([key, value]) => {
-      // Normalize by converting to lowercase and removing all extra spaces
-      const normalized = value.toLowerCase().trim()
-      normalizedHeaders[normalized] = key
-    })
-    console.log('Normalized headers:', normalizedHeaders)
-
-    // Create a mapping from Excel columns to DB columns
-    const headerToDbColumn = {}
-    const columnToExcelKey = {}
-    for (const [dbColumn, possibleHeaders] of Object.entries(columnMapping)) {
-      // Find matching header, ignoring spaces and case
-      const matchedHeader = possibleHeaders.find((header) =>
-        Object.keys(normalizedHeaders).some(
-          (normalizedHeader) =>
-            normalizedHeader === header.toLowerCase().trim(),
-        ),
-      )
-      if (matchedHeader) {
-        const normalizedMatch = matchedHeader.toLowerCase().trim()
-        const excelKey = normalizedHeaders[normalizedMatch]
-        headerToDbColumn[dbColumn] = excelKey
-        columnToExcelKey[dbColumn] = excelKey
-      }
-    }
-
-    console.log('Column mapping:', columnToExcelKey)
-
-    // Open database connection
-    const db = new Database(dbPath)
+    db = new Database(dbPath)
+    db.prepare('BEGIN').run()
 
     try {
-      // Begin transaction
-      db.prepare('BEGIN').run()
-
-      // Create insert statement with all fields
-      const insertSql = `
+      const insert = db.prepare(`
         INSERT INTO cure_list_voters (
           voter_id,
           party,
@@ -362,74 +312,65 @@ const importCureList = async (dbFilename, excelFile) => {
           city,
           phone,
           zip_code,
-          first_name,
-          last_name
+          last_name,
+          first_name
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      console.log('SQL:', insertSql)
+      `)
 
-      const insert = db.prepare(insertSql)
+      let imported = 0
+      for (const row of data) {
+        if (isNewFormat) {
+          // New format with separate name fields
+          const values = [
+            null, // voter_id (not available)
+            null, // party (not available)
+            `${row.lastname || row.LastName}, ${row.firstname || row.FirstName}`, // constructed name
+            row.registrationaddr1 || row.RegistrationAddr1 || '',
+            null, // city (not available)
+            null, // phone (not available)
+            formatZipCode(row.regzip5 || row.RegZip5),
+            row.lastname || row.LastName || '',
+            row.firstname || row.FirstName || ''
+          ]
+          insert.run(values)
+        } else {
+          // Original format with name parsing
+          const nameParts = (row.Name || '').split(',').map(part => part.trim())
+          const lastName = nameParts[0] || ''
+          const firstName = nameParts[1] || ''
+          
+          // Extract zip code from address using regex
+          const zipMatch = (row['Mailed To'] || '').match(/\b\d{5}\b/)
+          const zipCode = zipMatch ? zipMatch[0] : ''
 
-      // Insert each row (skipping header)
-      let importedCount = 0
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i]
-
-        // Extract city and ZIP from the combined field
-        const cityField = row[headerToDbColumn['city_raw']] || ''
-        const zipCode = extractZipCode(cityField)
-        const city = cleanCity(cityField)
-
-        // Parse name into first and last
-        const fullName = row[headerToDbColumn['name']] || ''
-        const { firstName, lastName } = parseName(fullName)
-
-        // Debug: show the first data row
-        if (importedCount === 0) {
-          console.log('First row data:', row)
-          console.log('Raw city field:', cityField)
-          console.log('Extracted city:', city)
-          console.log('Extracted ZIP:', zipCode)
-          console.log('Full name:', fullName)
-          console.log('Parsed name:', { firstName, lastName })
+          const values = [
+            row['Voter ID'] || '',
+            row.Party || '',
+            row.Name || '',
+            row['Mailed To'] || '',
+            row.City || '',
+            row.Phone || '',
+            zipCode,
+            lastName,
+            firstName
+          ]
+          insert.run(values)
         }
-
-        const values = [
-          row[headerToDbColumn['voter_id']] || '',
-          row[headerToDbColumn['party']] || '',
-          row[headerToDbColumn['name']] || '',
-          row[headerToDbColumn['mailed_to']] || '',
-          city,
-          row[headerToDbColumn['phone']] || '',
-          zipCode,
-          firstName,
-          lastName,
-        ].map((val) => val.toString().trim())
-
-        if (importedCount === 0) {
-          console.log('Extracted values:', values)
-        }
-
-        insert.run(...values)
-        importedCount++
+        imported++
       }
 
-      // Commit transaction
       db.prepare('COMMIT').run()
-
-      console.log(`Successfully imported ${importedCount} voters`)
+      console.log(`Successfully imported ${imported} cure list voters`)
       return 0 // Success
     } catch (error) {
-      // Rollback on error
       db.prepare('ROLLBACK').run()
       throw error
-    } finally {
-      // Close database connection
-      db.close()
     }
   } catch (error) {
     console.error('Error importing cure list:', error)
     return 1 // Error
+  } finally {
+    if (db) db.close()
   }
 }
 
@@ -476,6 +417,7 @@ const generateReport = async (dbFilename, outputFile) => {
       JOIN contributions c 
         ON v.last_name = c.contributor_last_name 
         AND v.first_name = c.contributor_first_name
+        AND v.zip_code = c.contributor_zip
       ORDER BY v.last_name, v.first_name, c.contribution_receipt_date DESC
     `,
       )
@@ -549,6 +491,13 @@ function handleCliCommands(args) {
   // ... rest of your command setup ...
 
   program.parse(['node', 'cure-contributors', ...args])
+}
+
+// Add this helper function
+const formatZipCode = (zip) => {
+  if (!zip) return ''
+  // Convert to string, remove any non-digits, take first 5 digits
+  return String(zip).replace(/\D/g, '').slice(0, 5).padStart(5, '0')
 }
 
 module.exports = {
