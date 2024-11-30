@@ -91,12 +91,20 @@ const createDb = async (dbFilename) => {
         ON contributions(contributor_first_name, contributor_last_name);
       CREATE INDEX IF NOT EXISTS idx_contributor_zip 
         ON contributions(contributor_zip);
+      CREATE INDEX IF NOT EXISTS idx_contributor_name_zip 
+        ON contributions(contributor_first_name, contributor_last_name, contributor_zip);
+      CREATE INDEX IF NOT EXISTS idx_contributor_street_1 
+        ON contributions(contributor_street_1);
       CREATE INDEX IF NOT EXISTS idx_voter_id
         ON cure_list_voters(voter_id);
       CREATE INDEX IF NOT EXISTS idx_voter_name 
         ON cure_list_voters(last_name, first_name);
       CREATE INDEX IF NOT EXISTS idx_voter_zip 
         ON cure_list_voters(zip_code);
+      CREATE INDEX IF NOT EXISTS idx_voter_name_zip 
+        ON cure_list_voters(last_name, first_name, zip_code);
+      CREATE INDEX IF NOT EXISTS idx_voter_mailed_to 
+        ON cure_list_voters(mailed_to);
     `)
 
     // Close the database connection
@@ -295,8 +303,9 @@ const importCureList = async (dbFilename, xlsxFile) => {
 
     // Detect format based on headers (case-insensitive)
     const firstRow = data[0]
-    const headers = Object.keys(firstRow).map(h => h.toLowerCase())
-    const isNewFormat = headers.includes('firstname') && headers.includes('lastname')
+    const headers = Object.keys(firstRow).map((h) => h.toLowerCase())
+    const isNewFormat =
+      headers.includes('firstname') && headers.includes('lastname')
     console.log(`Detected format: ${isNewFormat ? 'new' : 'original'}`)
 
     db = new Database(dbPath)
@@ -330,18 +339,30 @@ const importCureList = async (dbFilename, xlsxFile) => {
             null, // phone (not available)
             formatZipCode(row.regzip5 || row.RegZip5),
             row.lastname || row.LastName || '',
-            row.firstname || row.FirstName || ''
+            row.firstname || row.FirstName || '',
           ]
           insert.run(values)
         } else {
           // Original format with name parsing
-          const nameParts = (row.Name || '').split(',').map(part => part.trim())
-          const lastName = nameParts[0] || ''
-          const firstName = nameParts[1] || ''
-          
-          // Extract zip code from address using regex
-          const zipMatch = (row['Mailed To'] || '').match(/\b\d{5}\b/)
-          const zipCode = zipMatch ? zipMatch[0] : ''
+          // const nameParts = (row.Name || '').split(',').map(part => part.trim())
+          // const lastName = nameParts[0] || ''
+          // const firstName = nameParts[1] || ''
+          const { lastName, firstName } = parseName(row.Name)
+
+          // Extract zip code from address - try multiple patterns
+          let zipCode = ''
+          //const mailedTo = row['Mailed To'] || ''
+          const cityStateZip = row.City || ''
+
+          // First try to find a 5-digit sequence
+          const zipMatch = cityStateZip.match(/\b\d{5}\b/)
+          if (zipMatch) {
+            zipCode = zipMatch[0]
+          } else {
+            // If no 5-digit sequence, try to find any sequence of 4-5 digits at the end
+            const looseMatch = cityStateZip.match(/\b\d{4,5}$/)
+            zipCode = looseMatch ? looseMatch[0].padStart(5, '0') : ''
+          }
 
           const values = [
             row['Voter ID'] || '',
@@ -350,9 +371,9 @@ const importCureList = async (dbFilename, xlsxFile) => {
             row['Mailed To'] || '',
             row.City || '',
             row.Phone || '',
-            zipCode,
+            formatZipCode(zipCode),
             lastName,
-            firstName
+            firstName,
           ]
           insert.run(values)
         }
