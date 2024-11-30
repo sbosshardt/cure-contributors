@@ -306,7 +306,14 @@ const importCureList = async (dbFilename, xlsxFile) => {
     const headers = Object.keys(firstRow).map((h) => h.toLowerCase())
     const isNewFormat =
       headers.includes('firstname') && headers.includes('lastname')
-    console.log(`Detected format: ${isNewFormat ? 'new' : 'original'}`)
+
+    // Find voter ID field if it exists (look for 'regid' in any header)
+    const voterIdField = Object.keys(firstRow).find((header) =>
+      header.toLowerCase().includes('regid'),
+    )
+    console.log(
+      `Detected format: ${isNewFormat ? 'new' : 'original'}${voterIdField ? `, using ${voterIdField} for voter ID` : ''}`,
+    )
 
     db = new Database(dbPath)
     db.prepare('BEGIN').run()
@@ -331,9 +338,9 @@ const importCureList = async (dbFilename, xlsxFile) => {
         if (isNewFormat) {
           // New format with separate name fields
           const values = [
-            null, // voter_id (not available)
+            voterIdField ? row[voterIdField] || '' : null, // Use found voter ID field if it exists
             null, // party (not available)
-            `${row.lastname || row.LastName}, ${row.firstname || row.FirstName}`, // constructed name
+            `${row.lastname || row.LastName}, ${row.firstname || row.FirstName}`,
             row.registrationaddr1 || row.RegistrationAddr1 || '',
             null, // city (not available)
             null, // phone (not available)
