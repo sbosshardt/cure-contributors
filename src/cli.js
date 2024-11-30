@@ -112,7 +112,7 @@ function setupCliCommands(program) {
       const code = await tasks.generateReport(
         dbFile,
         options.outputFile || null,
-        options.debug || false
+        options.debug || false,
       )
       process.exit(code)
     })
