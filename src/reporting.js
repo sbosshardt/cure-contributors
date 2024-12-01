@@ -9,26 +9,20 @@ const displayReportCli = (matches) => {
 
     contributions.forEach((contribution) => {
       console.log('\nContribution:')
+      console.log(`  Full Name: ${contribution.contributor_last_name}, ${contribution.contributor_first_name}`)
+      console.log(`  Street Address: ${contribution.contributor_street_1}`)
+      console.log(`  ZIP Code: ${contribution.contributor_zip}`)
       console.log(`  Committee: ${contribution.committee_name}`)
-      console.log(`  Amount: $${contribution.contribution_receipt_amount}`)
-      console.log(`  Date: ${contribution.contribution_receipt_date}`)
-      console.log(
-        `  Contributor: ${contribution.contributor_first_name} ${contribution.contributor_last_name}`,
-      )
-      console.log(`  Address: ${contribution.contributor_street_1}`)
+      console.log(`  Contributions: ${contribution.total_contributions.toLocaleString()}`)
+      console.log(`  Most Recent: $${contribution.contribution_receipt_amount.toFixed(2)} on ${contribution.contribution_receipt_date.split('T')[0]}`)
+      console.log(`  Total Amount: $${contribution.total_amount.toFixed(2)}`)
 
-      // Add match details section
+      // Match details section
       console.log('  Match Details:')
-      console.log(
-        `    Address: ${contribution.match_details.address ? '✓' : '✗'}`,
-      )
-      console.log(`    ZIP Code: ${contribution.match_details.zip ? '✓' : '✗'}`)
-      console.log(
-        `    First Name: ${contribution.match_details.first_name ? '✓' : '✗'}`,
-      )
-      console.log(
-        `    Last Name: ${contribution.match_details.last_name ? '✓' : '✗'}`,
-      )
+      console.log(`    Address: ${contribution.match_details.address ? '✓' : '✗'}`)
+      console.log(`    ZIP: ${contribution.match_details.zip ? '✓' : '✗'}`)
+      console.log(`    First Name: ${contribution.match_details.first_name ? '✓' : '✗'}`)
+      console.log(`    Last Name: ${contribution.match_details.last_name ? '✓' : '✗'}`)
     })
   })
 }
@@ -176,10 +170,10 @@ const generateHtmlReport = (matches) => {
           <div class="section-title">Cure List Voter</div>
           <div class="field"><span class="label">Last Name:</span> ${match.voter.last_name}</div>
           <div class="field"><span class="label">First Name:</span> ${match.voter.first_name}</div>
+          <div class="field"><span class="label">Street Address:</span> ${match.voter.mailed_to}</div>
           <div class="field"><span class="label">Zip Code:</span> ${match.voter.zip_code}</div>
           <div class="field"><span class="label">Party:</span> ${match.voter.party}</div>
           <div class="field"><span class="label">Full Name:</span> ${match.voter.name}</div>
-          <div class="field"><span class="label">Street Address:</span> ${match.voter.mailed_to}</div>
           <div class="field"><span class="label">Voter ID:</span> ${match.voter.voter_id}</div>
         </div>
         
@@ -191,12 +185,11 @@ const generateHtmlReport = (matches) => {
             <div class="contribution">
               <div class="field"><span class="label">Full Name:</span> ${contribution.contributor_last_name}, ${contribution.contributor_first_name}</div>
               <div class="field"><span class="label">Street Address:</span> ${contribution.contributor_street_1}</div>
+              <div class="field"><span class="label">ZIP Code:</span> ${contribution.contributor_zip}</div>
               <div class="field"><span class="label">Committee:</span> ${contribution.committee_name}</div>
-              <div class="field"><span class="label">Date:</span> ${contribution.contribution_receipt_date}</div>
-              <div class="field"><span class="label">Amount:</span> $${contribution.contribution_receipt_amount.toFixed(2)}</div>
-              <div class="field"><span class="label">Employer:</span> ${contribution.contributor_employer}</div>
-              <div class="field"><span class="label">Occupation:</span> ${contribution.contributor_occupation}</div>
-              <div class="field"><span class="label">Transaction ID:</span> ${contribution.transaction_id}</div>
+              <div class="field"><span class="label">Contributions:</span> ${contribution.total_contributions.toLocaleString()}</div>
+              <div class="field"><span class="label">Most Recent:</span> $${contribution.contribution_receipt_amount.toFixed(2)} on ${contribution.contribution_receipt_date.split('T')[0]}</div>
+              <div class="field"><span class="label">Total Amount:</span> $${contribution.total_amount.toFixed(2)}</div>
               
               <div class="match-details">
                 <div class="section-title">Match Details</div>
@@ -225,7 +218,7 @@ const generateHtmlReport = (matches) => {
     
     <div class="summary">
       Total Voters Found: ${matches.length}<br>
-      Total Contributions: ${matches.reduce((sum, m) => sum + m.contributions.length, 0)}
+      Committee Contributors: ${matches.reduce((sum, m) => sum + m.contributions.length, 0)}
     </div>
   </body>
   </html>
@@ -673,6 +666,7 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
           contributor_occupation: row.contributor_occupation,
           transaction_id: row.transaction_id,
           contribution_receipt_amount: row.contribution_receipt_amount,
+          contributor_zip: row.contributor_zip,
           // Add match indicators
           match_details: {
             address: row.address_matched === 1,
@@ -685,7 +679,10 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
         return acc
       }, {})
 
-      const transformedMatches = Object.values(groupedMatches)
+      const transformedMatches = Object.values(groupedMatches).map(match => ({
+        ...match,
+        contributions: summarizeContributions(match.contributions)
+      }))
       console.log(
         `Report processing completed in ${((Date.now() - reportStart) / 1000).toFixed(1)} seconds`,
       )
@@ -727,6 +724,40 @@ const generateReport = async (dbFilename, outputFile, debug = false) => {
     console.error('Error in report generation:', error)
     return 1
   }
+}
+
+const summarizeContributions = (contributions) => {
+  // Group by committee + name + address + zip
+  const groups = contributions.reduce((acc, contrib) => {
+    const key = `${contrib.committee_name}|${contrib.contributor_last_name}|${contrib.contributor_first_name}|${contrib.contributor_street_1}|${contrib.contributor_zip}`
+    
+    if (!acc[key]) {
+      acc[key] = {
+        // Keep all details from most recent contribution
+        ...contrib,
+        total_contributions: 0,
+        total_amount: 0,
+      }
+    }
+
+    acc[key].total_contributions++
+    acc[key].total_amount += contrib.contribution_receipt_amount
+
+    // Update if this contribution is more recent
+    const currentDate = new Date(acc[key].contribution_receipt_date)
+    const newDate = new Date(contrib.contribution_receipt_date)
+    if (newDate > currentDate) {
+      acc[key] = {
+        ...contrib,
+        total_contributions: acc[key].total_contributions,
+        total_amount: acc[key].total_amount,
+      }
+    }
+
+    return acc
+  }, {})
+
+  return Object.values(groups)
 }
 
 module.exports = {
