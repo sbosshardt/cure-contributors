@@ -102,16 +102,13 @@ function setupCliCommands(program) {
   program
     .command('generate-report')
     .argument('<dbFile>', 'Database file to generate report from')
+    .argument('[outputFile]', 'Optional output file for HTML report')
     .description('Generate a report based on the database')
-    .option(
-      '-o, --output-file <outputFile>',
-      'Write output to a file instead of stdout',
-    )
     .option('-d, --debug', 'Enable debug logging for normalization steps')
-    .action(async (dbFile, options) => {
+    .action(async (dbFile, outputFile, options) => {
       const code = await tasks.generateReport(
         dbFile,
-        options.outputFile || null,
+        outputFile || null,
         options.debug || false,
       )
       process.exit(code)
